@@ -1,6 +1,6 @@
-library(Sushi) # new dep?
-library(MTseeker) 
-library(GenomicAlignments) # needs GenomicAlignments::coverage for this step
+#library(Sushi) # new dep?
+#library(MTseeker) 
+#library(GenomicAlignments) # needs GenomicAlignments::coverage for this step
 #MTreads <- readRDS("bulkATAC_MTreads.rds") 
 
 #' plot read coverage across the mitochondrial genome 
