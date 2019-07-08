@@ -1,0 +1,246 @@
+---
+title: "MTseeker example"
+shorttitle: "MTseeker guide"
+author: 
+  - Tim Triche, Jr. 
+  - Noor Sohail 
+package: MTseeker
+abstract: >
+  An example of processing renal oncocytomas and matched normal
+  kidney samples with MTseeker, calling variants and plotting results.
+vignette: >
+  %\VignetteIndexEntry{MTseeker example}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+output: 
+  BiocStyle::html_document:
+    toc_float: true
+---
+
+# Introduction
+
+MTseeker works best when given some interesting mitochondrial data to work with.
+Renal oncocytomas are great big pink cells that are jammed full of defective 
+mitochondria, and sometimes progress to genomically unstable chromophobe renal
+cell carcinomas (kidney cancer) in unlucky hosts. Nobody seems to be entirely 
+sure what role mitochondrial variants play in their evolution, but the cells 
+have thousands of mitochondria stuffed into them. So that's what we'll study.
+
+
+# Loading data
+
+First we needed to load the oncocytoma BAMs. We don't actually do this here, 
+since they are several gigabytes apiece, but notice that all of them have 
+been aligned with BWA against the canonical rCRS mitogenome by splicing it 
+into hg19. (As opposed to GRCh37, which is what we should have done... but
+the point is that any modern GRCh assembly *or* a spliced rCRS contig works.)
+
+```{r loadLibrary}
+library(MTseeker)
+```
+
+```{r loadBams, eval=FALSE} 
+if (FALSE) { 
+  # we use SamBlaster... a lot... in my lab.
+  # however, this example takes a while even with SamBlaster. 
+  # it is recorded here for posterity and also "how did you get that result". 
+  BAMfiles <- grep("(split|disc)", value=T, invert=T, list.files(patt=".bam$"))
+  names(BAMfiles) <- sapply(strsplit(BAMfiles, "\\."), `[`, 1)
+  BAMs <- data.frame(BAM=BAMfiles, 
+                     Sample_Group=ifelse(grepl("NKS", BAMfiles), 
+                                         "normal","tumor"))
+  rownames(BAMs) <- sub("NKS", "normal", sub("RO","oncocytoma", rownames(BAMs)))
+  BAMs$subject <- as.integer(sapply(strsplit(BAMs$BAM, "(_|\\.)"), `[`, 2))
+
+  # we merged all the BAMs after-the-fact, so...
+  BAMs <- subset(BAMs, grepl("merged", BAMs$BAM))
+  BAMs <- BAMs[order(BAMs$subject), ]
+
+  library(parallel) 
+  options("mc.cores"=detectCores())
+  MTreads <- getMT(BAMs, filter=FALSE) 
+  names(MTreads) <- sapply(strsplit(fileName(MTreads), "\\."), `[`, 1)
+  saveRDS(MTreads, file="oncocytoma_and_matched_normal_MTreads.rds")
+}
+```
+
+Since realigning 22 whole exomes and extracting/counting reads takes a while,
+we created the MTseekerData package to hold the output from doing the above. 
+The _RONKSreads_ and _RONKSvariants_ data objects hold aligned reads (as 
+an MAlignments object) and called variants (as an MVRangesList object)
+comparing _R_enal _O_ncocytomas and _N_ormal _K_idney _S_amples from 11 
+subjects who developed this premalignant neoplasia of the kidney. Most such 
+cases seem to be self-limiting, perhaps due to their defective mitophagy, and
+they accumulate thousands of excess mitochondria with Complex I defects. If
+these tumors do become malignant, they tend to turn into chromophobe renal
+cell carcinomas, a type of kidney cancer that is characterized by aneuploidy 
+of all or nearly all chromosomes. So the relationship between a self-limiting
+oncocytoma and a genomically unstable carcinoma is thought to hinge at least 
+in part on how the affected cell deals with metabolic derangement, and whether
+that results in the accumulation of additional mutations (like _TP53_ in CRCCs).
+
+
+```{r loadDataLibrary}
+library(MTseekerData)
+```
+
+# Relative mitochondrial copy number changes
+
+We'd like to compute the relative mitochondrial copy number for each.
+For whatever reason, this seems to throw an error in the vignette build 
+if we plot all of them, so we will just plot a subset in this vignette. 
+
+```{r computeCN}
+data(RONKSreads, package="MTseekerData")
+mVn <- Summary(RONKSreads)$mitoVsNuclear
+names(mVn) <- names(RONKSreads) 
+CN <- mVn[seq(2,22,2)]/mVn[seq(1,21,2)] 
+mtCN <- data.frame(subject=names(CN), CN=CN)
+
+library(ggplot2) 
+library(ggthemes)
+p <- ggplot(head(mtCN), aes(x=subject, y=CN, fill=subject)) + 
+       geom_col() + theme_tufte(base_size=24) + ylim(0,4) + 
+       ylab("Tumor/normal mitochondrial ratio") + 
+       ggtitle("Mitochondrial retention in oncocytomas")
+print(p)
+```
+
+Note that some of the oncocytomas appear to have fewer mitochondrial genome
+copies than their normal kidney sample counterparts, contrary to intuition. 
+These tumors usually stain as great big pink eosinophil-like cells on slides,
+supposedly due to their massive cytoplasmic load of mitochongdria. For whatever
+reason, though, the amount of (non-duplicated) mtDNA recovered in some of the 
+oncocytomas relative to nearby normal kidney cells isn't always much greater. 
+(It is also possible that some neighboring cells might also be premalignant.)
+
+# Calling variants
+
+Obviously it's not much good to have a variant caller that can't call variants,
+so we demonstrate that here. (Note: tumor/normal calls, haplogroup inference,
+and soft-backfiltering of haplogroup-determining variants are works in progress,
+so we do not currently demonstrate them here, although the fpFilter datasets 
+are useful for these purposes) At present, MTseeker supports the _gmapR_ package
+for mitochondrial variant calling, though we plan to provide cross-platform 
+support via Rsamtools::pileup in the near future.     
+
+gmapR can be a bit feisty, so we simply document the process below: 
+
+```{r callVariants, eval=FALSE} 
+if (FALSE) { 
+  # doing this requires the BAM files
+  RONKSvariants <- callMT(RONKSreads)
+  # which is why we skip it in the vignette 
+  save(RONKSvariants, file="RONKSvariants.rda")
+  # see ?callMT for a much simpler runnable example
+}
+```
+
+For this vignette, we have stored the results in the MTseekerData package:
+
+```{r loadVariants}
+library(MTseekerData)
+data(RONKSvariants, package="MTseekerData")
+```
+
+# Plotting variants
+
+Let's filter out some of the common variants, to focus on those only seen in
+the renal oncocytoma samples. The `filterMT` function drops samples with median
+read depth less than 20x, and if requested, also drops variants that fall into 
+known homopolymeric regions (fpFilter=TRUE) or have variant allele frequencies 
+(VAFs) of less than 0.03, many or most of which are likely to be NuMT (nu-mite)
+sequences that map equally well between nuclear and mitochondrial assemblies.
+
+The coverage filter is somewhat gratuitous, since the shallowest mitochondrial
+coverage in this study is 333x, but the false-positive filter and the NuMT 
+filter are both a good idea in most studies. Additionally, variant calls that
+are not marked as PASSing quality control are all dropped at this stage. The 
+`granges` method for MVRanges and MVRangesList objects turns a set of variant
+calls into a GenomicRanges object with the aggregated affected regions.
+
+```{r filterRoVariants}
+RO <- grep("RO_", names(RONKSvariants))
+filtered_RO <- filterMT(RONKSvariants[RO], fpFilter=TRUE, NuMT=TRUE)
+RO_recurrent <- subset(granges(filtered_RO), 
+                       region == "coding" & rowSums(overlaps) > 1)
+```
+
+Same thing for the normal kidney samples, so that we can weed out a bit more. 
+Again, we'll use the `granges` method to aggregate affected regions of chrM. 
+
+
+```{r filterNksVariants}
+NKS <- grep("NKS_", names(RONKSvariants))
+filtered_NKS <- filterMT(RONKSvariants[NKS], fpFilter=TRUE, NuMT=TRUE)
+NKS_recurrent <- subset(granges(filtered_NKS), 
+                        region == "coding" & rowSums(overlaps) > 1)
+NKS_gaps <- subset(gaps(NKS_recurrent), strand == "*")
+```
+
+Lastly, let's take only the variants in the oncocytomas that do not overlap
+recurrent variants in the normal kidney samples, to simplify our plotting.
+
+```{r pruneVariants}
+RONKSfiltered <- endoapply(filterMT(RONKSvariants), subsetByOverlaps, NKS_gaps)
+RONKScoding <- encoding(RONKSfiltered)
+```
+
+OK, now we have whittled away some of the more common variants to focus
+on those that seem to be specific and recurrent in the oncocytomas. Let's
+plot the resulting variants in the first few samples. The plot looks a bit 
+like tree rings; each tree ring is one sample, and each black mark is a 
+variant (of whatever minimum variant allele frequency, or VAF, enforced)
+in a particular sample. The color-coded lines point to where on chrM the 
+variant maps back to, since there are sparse and dense regions of variation.
+For whatever reason, vignette builds fail if we plot all of the variants,
+so we skip this step in the production vignette. (It _is_ done in the build!) 
+
+
+```{r plotVariants, eval=FALSE}
+plot(RONKScoding)
+```
+
+The resulting plot looks like so:
+
+![mtDNA variants in oncocytomas and normal kidney samples](RO_NKS_filtered.png)
+
+We are planning to add haplogroup inference and masking in an upcoming release
+and the PhyloTree XML data prepared by the fine HaploGrep folks is part of 
+MTseekerData for exactly this purpose. The interaction between haplogroups 
+(inherited and ancestry-informative mitochondrial variant haplotypes) and 
+germline or somatic variants, in both mitochondrial and nuclear genomes, is a 
+topic of substantial research interest due to its clear metabolic implications.
+
+
+# Plotting functional impacts
+
+Now let's plot a cartoon of the putative functional impact in one patient (RO1):
+
+```{r makeSVG}
+data(RONKSvariants, package="MTseekerData")
+SVG <- MTseeker::MTcomplex(RONKSvariants[[2]]) 
+```
+
+The above will bring up an image in a browser window like the one in the README.
+You can also generate a PDF file of the modified rendering if you prefer:
+
+```{r makePDF, eval=FALSE}
+library(rsvg) 
+tmppdf <- paste(tempdir(), "RO_1.functionalAnnot.pdf", sep="/") 
+rsvg_pdf(tmppdf)
+```
+
+We might like to add a biohazard/mutagen symbol to complexes within the electron
+transport chain (ETC) that are impacted by nonsynonymous variants, and this is 
+in progress. The output is Scalable Vector Graphics (SVG) based on an image 
+created and shared by Tim Vickers at Washington University in St. Louis. Any
+suggestions regarding how to scale this visual up to populations of cells, 
+people, or organisms are welcome; some components (such as in Complex II) have 
+migrated to the nuclear genome in humans, while others are retained in mtDNA in 
+humans but lost to nuclear genomes in other eukaryotes. Moreover, tendencies 
+for particular diseases or conditions to hit particular complexes are of both
+biological and medical interest, which is why we added this in the first place.
+
+We hope you enjoy working with mitochondrial genomes as much as we have. Please
+send an email to trichelab@gmail.com if you have comments or suggestions. 

@@ -2,37 +2,57 @@
 % Please edit documentation in R/callMT.R
 \name{callMT}
 \alias{callMT}
-\alias{callMtVars}
+\alias{callMTVars}
 \title{call mitochondrial variants against rCRS from an MAlignments[List] object}
 \usage{
 callMT(mal, ..., parallel = FALSE, verbose = FALSE)
 
-callMtVars(BAM, SIZE = 75, GENOME = "rCRS", CHR = "chrM",
-  COV = NULL, verbose = F)
+callMTVars(BAM, SIZE = 75, GENOME = "rCRS", CHR = "chrM",
+  COV = NULL, verbose = FALSE)
 }
 \arguments{
 \item{mal}{an MAlignments (or, potentially, an MAlignmentsList)}
 
-\item{...}{other optional arguments to pass to callVariants}
+\item{...}{other arguments to pass to VariantTools::callVariants}
 
 \item{parallel}{try to run in parallel? (FALSE; this is super unstable)}
 
 \item{verbose}{be verbose? (FALSE; turn on for debugging purposes)}
 
-\item{BAM}{the BAM filename (for callMtVars)}
+\item{BAM}{the BAM filename (for callMTVars)}
 
-\item{SIZE}{the read length (for callMtVars; default is 75)}
+\item{SIZE}{the read length (for callMTVars; default is 75)}
 
-\item{GENOME}{the reference genome (for callMtVars; default is rCRS)}
+\item{GENOME}{the reference genome (for callMTVars; default is rCRS)}
 
-\item{CHR}{the mt contig name (for callMtVars; default is chrM)}
+\item{CHR}{the mt contig name (for callMTVars; default is chrM)}
 
 \item{COV}{average read coverage (so we don't have to countBam)}
 }
+\value{
+an MVRanges (or, potentially, an MVRangesList)
+}
 \description{
-`callMtVars` is a helper function for callMT
+`callMTVars` is a helper function for callMT
 }
 \details{
-FIXME: figure out a way to reprocess extracted chrM/MT reads against rCRS,
-       regardless of what reference they were originally aligned against.
+FIXME: transition gmapR from import to suggestion
+FIXME: use Rsamtools::pileup by default
+FIXME: optional haplogroup masking?
+}
+\examples{
+
+library(MTseekerData)
+BAMdir <- system.file("extdata", "BAMs", package="MTseekerData")
+BAMs <- paste0(BAMdir, "/", list.files(BAMdir, pattern=".bam$"))
+(mal <- getMT(BAMs[1]))
+if (requireNamespace("GmapGenome.Hsapiens.rCRS", quietly=TRUE)) {
+  (mvr <- callMT(mal))
+  filt(snpCall(mvr))
+} else { 
+  message("You have not yet installed an rCRS reference genome.")
+  message("Consider running the indexMTgenome() function to do so.")
+  message("The RONKSvariants object in MTseekerData is a result of callMT.")
+}
+
 }

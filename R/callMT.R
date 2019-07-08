@@ -1,21 +1,39 @@
 #' call mitochondrial variants against rCRS from an MAlignments[List] object 
 #'
-#' `callMtVars` is a helper function for callMT 
+#' `callMTVars` is a helper function for callMT 
 #'
-#' FIXME: figure out a way to reprocess extracted chrM/MT reads against rCRS,
-#'        regardless of what reference they were originally aligned against.
+#' FIXME: transition gmapR from import to suggestion
+#' FIXME: use Rsamtools::pileup by default
+#' FIXME: optional haplogroup masking?
 #' 
 #' @name  callMT
 #'
 #' @param mal         an MAlignments (or, potentially, an MAlignmentsList) 
-#' @param ...         other optional arguments to pass to callVariants
+#' @param ...         other arguments to pass to VariantTools::callVariants
 #' @param parallel    try to run in parallel? (FALSE; this is super unstable)
 #' @param verbose     be verbose? (FALSE; turn on for debugging purposes)
 #'
+#' @return            an MVRanges (or, potentially, an MVRangesList) 
+#' 
 #' @import gmapR
 #' @import VariantTools
 #' @import GenomicAlignments
 #'
+#' @examples
+#' 
+#' library(MTseekerData)
+#' BAMdir <- system.file("extdata", "BAMs", package="MTseekerData")
+#' BAMs <- paste0(BAMdir, "/", list.files(BAMdir, pattern=".bam$"))
+#' (mal <- getMT(BAMs[1]))
+#' if (requireNamespace("GmapGenome.Hsapiens.rCRS", quietly=TRUE)) {
+#'   (mvr <- callMT(mal))
+#'   filt(snpCall(mvr))
+#' } else { 
+#'   message("You have not yet installed an rCRS reference genome.")
+#'   message("Consider running the indexMTgenome() function to do so.")
+#'   message("The RONKSvariants object in MTseekerData is a result of callMT.")
+#' }
+#' 
 #' @export
 callMT <- function(mal, ..., parallel=FALSE, verbose=FALSE) {
 
@@ -35,16 +53,16 @@ callMT <- function(mal, ..., parallel=FALSE, verbose=FALSE) {
 
     if (parallel == TRUE) { 
       warning("Parallel mtDNA variant calling is REALLY flaky at the moment.") 
-      mvrl <- MVRangesList(mcmapply(callMtVars,
+      mvrl <- MVRangesList(mcmapply(callMTVars,
                                     BAM=metadata(mal)$cache$BAM,
                                     SIZE=metadata(mal)$cache$readLength,
-                                    GENOME=metadata(mal)$cache$genome,
+                                    GENOME=unique(genome(mal)),
                                     CHR=rep(mtChr, length(mal))))
     } else { 
-      mvrl <- MVRangesList(mapply(callMtVars,
+      mvrl <- MVRangesList(mapply(callMTVars,
                                   BAM=metadata(mal)$cache$BAM,
                                   SIZE=metadata(mal)$cache$readLength,
-                                  GENOME=metadata(mal)$cache$genome,
+                                  GENOME=unique(genome(mal)),
                                   CHR=rep(mtChr, length(mal))))
     }
     seqinfo(mvrl) <- seqinfo(mal) 
@@ -54,10 +72,10 @@ callMT <- function(mal, ..., parallel=FALSE, verbose=FALSE) {
   } else if (is(mal, "MAlignments")) { 
 
     mtChr <- grep("(MT|chrM|NC_012920.1|rCRS)", seqlevelsInUse(mal), value=TRUE)
-    mvr <- callMtVars(BAM=fileName(mal),
-                      COV=coverage(mal),
-                      SIZE=runLength(mal),
-                      GENOME=unname(unique(genome(mal))),
+    mvr <- callMTVars(BAM=fileName(mal),
+                      COV=genomeCoverage(mal),
+                      SIZE=readLength(mal),
+                      GENOME=unique(genome(mal)),
                       CHR=mtChr)
     seqinfo(mvr) <- seqinfo(mal)
     return(mvr)
@@ -69,14 +87,15 @@ callMT <- function(mal, ..., parallel=FALSE, verbose=FALSE) {
 
 #' @rdname callMT
 #' 
-#' @param BAM       the BAM filename (for callMtVars)
-#' @param SIZE      the read length (for callMtVars; default is 75)
-#' @param GENOME    the reference genome (for callMtVars; default is rCRS)
-#' @param CHR       the mt contig name (for callMtVars; default is chrM)
+#' @param BAM       the BAM filename (for callMTVars)
+#' @param SIZE      the read length (for callMTVars; default is 75)
+#' @param GENOME    the reference genome (for callMTVars; default is rCRS)
+#' @param CHR       the mt contig name (for callMTVars; default is chrM)
 #' @param COV       average read coverage (so we don't have to countBam)
 #' 
 #' @export
-callMtVars <- function(BAM,SIZE=75,GENOME="rCRS",CHR="chrM",COV=NULL,verbose=F){
+callMTVars <- function(BAM, SIZE=75, GENOME="rCRS", CHR="chrM", COV=NULL,
+                       verbose=FALSE){
 
   gmapGenome <- paste("GmapGenome", "Hsapiens", GENOME, sep=".")
   if (verbose) {
@@ -85,12 +104,13 @@ callMtVars <- function(BAM,SIZE=75,GENOME="rCRS",CHR="chrM",COV=NULL,verbose=F){
 
   if (!requireNamespace(gmapGenome)) {
     if (GENOME == "rCRS") {
-      stop("MTseeker::indexMtGenome() will build a suitable ",gmapGenome,".")
+      stop("MTseeker::indexMTGenome() will build a suitable ",gmapGenome,".")
     }
   }
 
   # load the index (usually, rCRS skeleton key)
   try(attachNamespace(gmapGenome), silent=TRUE)
+  # BE CAREFUL HERE: this can break variant calling 
   whichRanges <- as(seqinfo(get(gmapGenome))[CHR], "GRanges")
 
   # for accounting purposes: 
@@ -137,7 +157,7 @@ callMtVars <- function(BAM,SIZE=75,GENOME="rCRS",CHR="chrM",COV=NULL,verbose=F){
   if (verbose) message("Formatting variants...") 
   mvr <- keepSeqlevels(MVRanges(res, coverage=COV), CHR, pruning.mode="coarse") 
   isCircular(mvr)[CHR]<- TRUE
-  names(mvr) <- mtHGVS(mvr)
+  names(mvr) <- MTHGVS(mvr)
   return(mvr)
 
 }

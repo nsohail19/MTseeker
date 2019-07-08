@@ -1,6 +1,8 @@
 #' wraps a GAlignmentsList (made up of MAlignments) for nicer viewing
 #' 
 #' @import GenomicAlignments
+#' @import S4Vectors
+#' @import IRanges
 #' 
 #' @exportClass MAlignmentsList
 setClass("MAlignmentsList", contains="GAlignmentsList")
@@ -8,12 +10,28 @@ setClass("MAlignmentsList", contains="GAlignmentsList")
 
 #' wrap a GAlignmentsList for viewing
 #'
+#' Normally the MAlignmentsList constructor will be called by getMT. 
+#' 
+#' @rdname          MAlignmentsList-methods
+#' 
 #' @param ...         MAlignments
 #'
 #' @return            an MAlignments 
 #' 
 #' @import            GenomicAlignments
 #' 
+#' @examples
+#' library(MTseekerData)
+#' BAMdir <- system.file("extdata", "BAMs", package="MTseekerData")
+#' print(BAMdir)
+#' BAMs <- paste0(BAMdir, "/", list.files(BAMdir, pattern=".bam$"))
+#' print(BAMs)
+#' targets <- data.frame(BAM=BAMs, stringsAsFactors=FALSE) 
+#' rownames(targets) <- sapply(strsplit(basename(BAMs), "\\."), `[`, 1)
+#' mall <- getMT(targets)
+#' class(mall) 
+#' show(mall) 
+#'
 #' @export
 MAlignmentsList <- function(...) {
 
@@ -21,8 +39,8 @@ MAlignmentsList <- function(...) {
   mdat <- list()
   mdat$cache <- data.frame(BAM=sapply(..., fileName),
                            reads=sapply(..., length),
-                           readLength=sapply(..., runLength), 
-                           genomeSize=sapply(..., runValue), 
+                           readLength=sapply(..., readLength), 
+                           genomeSize=sapply(..., genomeLength), 
                            genome=unname(sapply(..., genome)),
                            nuclearReads=unname(sapply(..., attr, "nucReads")),
                            mitoVsNuclear=unname(sapply(..., attr, "mtVsNuc")))
@@ -34,11 +52,17 @@ MAlignmentsList <- function(...) {
   mdat$cache$genomeCoverage <- with(mdat$cache, 
                                     round((reads*readLength) / genomeSize))
   mdat$summaryCols <- c("reads", "readLength", 
-                        "genomeSize", "genomeCoverage", 
-                        "nuclearReads", "mitoVsNuclear")
+                        "genomeSize", "genomeCoverage")
 
-  # because otherwise this clobbers it: 
-  gal <- GenomicAlignments:::GAlignmentsList(...)
+  # not relevant if only chrM reads  
+  if (any(mdat$cache$nuclearReads > 0)) {
+    mdat$summaryCols <- append(mdat$summaryCols, 
+                               c("nuclearReads","mitoVsNuclear"))
+  }
+
+  # if cache is not prepped beforehand, this will clobber it: 
+  gal <- GenomicAlignments::GAlignmentsList(...)
+  # and no, I don't entirely understand why
 
   # name entries if possible
   if (is.null(names(gal))) {
@@ -57,22 +81,26 @@ MAlignmentsList <- function(...) {
 
 #' MAlignmentsList methods (centralized).
 #'
+#' Depending on how a generic was originally designated, the arguments to 
+#' these methods can have various argument names, but all of them tend to 
+#' take an MAlignmentsList as their argument.
+#'
+#' @param x         an MAlignmentsList
+#' @param object    an MAlignmentsList
+#' 
+#' @return          various objects, as appropriate to the method 
+#'
 #' @name            MAlignmentsList-methods
 NULL
 
 
+
 #' @rdname          MAlignmentsList-methods
 #'
-#' @param x         an MAlignmentsList
-#' 
-#' @return          estimated coverage (numeric vector)
-#'
-#' @import          IRanges
-#' 
 #' @export
-setMethod("coverage", signature(x="MAlignmentsList"),
+setMethod("genomeCoverage", signature(x="MAlignmentsList"),
           function(x) {
-            covg <- metadata(x)$cache$coverage
+            covg <- metadata(x)$cache$genomeCoverage
             names(covg) <- names(x)
             return(covg)
           })
@@ -80,14 +108,8 @@ setMethod("coverage", signature(x="MAlignmentsList"),
 
 #' @rdname          MAlignmentsList-methods
 #'
-#' @param x         an MAlignmentsList
-#' 
-#' @return          estimated coverage (numeric vector)
-#'
-#' @import          S4Vectors
-#' 
 #' @export
-setMethod("runLength", signature(x="MAlignmentsList"),
+setMethod("readLength", signature(x="MAlignmentsList"),
           function(x) {
             rl <- metadata(x)$cache$readLength
             names(rl) <- names(x)
@@ -96,10 +118,6 @@ setMethod("runLength", signature(x="MAlignmentsList"),
 
 
 #' @rdname          MAlignmentsList-methods
-#' 
-#' @param object    an MAlignmentsList
-#' 
-#' @return          BAM file summary for the MAlignmentsList 
 #' 
 #' @export
 setMethod("fileName", signature(object="MAlignmentsList"),
@@ -112,20 +130,14 @@ setMethod("fileName", signature(object="MAlignmentsList"),
 
 #' @rdname          MAlignmentsList-methods
 #' 
-#' @param x         an MAlignmentsList
-#' 
-#' @return          a DataFrame
-#'
 #' @export
 setMethod("Summary", signature(x="MAlignmentsList"),
           function(x) {
-            metadata(x)$cache[, metadata(x)$summaryCols]
+            DataFrame(metadata(x)$cache[, metadata(x)$summaryCols])
           })
 
 
 #' @rdname          MAlignmentsList-methods
-#'
-#' @param objects   an MAlignmentsList
 #' 
 #' @export
 setMethod("show", signature(object="MAlignmentsList"),
@@ -137,3 +149,5 @@ setMethod("show", signature(object="MAlignmentsList"),
             cat("-------\n", sep = "")
             cat("seqinfo: ", summary(seqinfo(object)), "\n", sep = "")
           })
+
+

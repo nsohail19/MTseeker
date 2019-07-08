@@ -1,6 +1,8 @@
 #' like a VRanges, but for mitochondria
 #' 
 #' @import VariantAnnotation
+#' @importFrom S4Vectors endoapply
+#' @importFrom VariantAnnotation filt 
 #' 
 #' @exportClass MVRanges
 setClass("MVRanges", 
@@ -10,13 +12,37 @@ setClass("MVRanges",
 
 #' wrap a VRanges for mitochondrial use
 #'
+#' Usually the MVRanges constructor will be called by callMT(). 
+#' 
+#' @rdname    MVRanges-methods
+#'
 #' @param   vr        the VRanges
 #' @param   coverage  estimated coverage
 #'
 #' @return            an MVRanges
+#'
+#' @import BiocGenerics
+#'
+#' @examples
 #' 
+#' library(MTseekerData)
+#' BAMdir <- system.file("extdata", "BAMs", package="MTseekerData")
+#' BAMs <- paste0(BAMdir, "/", list.files(BAMdir, pattern=".bam$"))
+#' (mal <- getMT(BAMs[1]))
+#' if (requireNamespace("GmapGenome.Hsapiens.rCRS", quietly=TRUE)) {
+#'   (mvr <- callMT(mal))
+#'   locateVariants(mvr)
+#'   predictCoding(mvr) 
+#' } else { 
+#'   message("You have not yet installed an rCRS reference genome.")
+#'   message("Consider running the indexMTgenome() function to do so.")
+#'   message("An example MVRanges is RONKSvariants$RO_1 from MTseekerData.")
+#' }
+#' 
+#' # summarizeVariants can take too long to run, and requires internet access 
+#'
 #' @export
-MVRanges <- function(vr, coverage) new("MVRanges", vr, coverage=coverage)
+MVRanges <- function(vr, coverage=NA_real_) new("MVRanges",vr,coverage=coverage)
 
 
 #' MVRanges methods (centralized).
@@ -28,7 +54,8 @@ MVRanges <- function(vr, coverage) new("MVRanges", vr, coverage=coverage)
 #' 
 #' `pos` returns a character vector describing variant positions. 
 #' `filt` returns a subset of variant calls where PASS == TRUE (i.e. filtered)
-#' `coverage` returns the estimated average mitochondrial read coverage depth
+#' `coverage` returns an Rle of coverage across the mitochondrial genome
+#' `genomeCoverage` returns the estimated mitochondrial read coverage depth
 #'
 #' @section Annotation methods:
 #' 
@@ -42,6 +69,7 @@ MVRanges <- function(vr, coverage) new("MVRanges", vr, coverage=coverage)
 #' `predictCoding` returns variants consequence predictions as one might expect
 #' `tallyVariants` returns a named vector of variant types by annotated region.
 #' `summarizeVariants` uses MitImpact to attempt annotation of coding variants.
+#' `consensusString` edits rCRS to create a consensus genotype for eg Haplogrep
 #'
 #' @section Visualization methods:
 #'
@@ -51,10 +79,30 @@ MVRanges <- function(vr, coverage) new("MVRanges", vr, coverage=coverage)
 #' @param object        an MVRanges
 #' @param annotations   an MVRanges
 #' @param query         an MVRanges
+#' @param mode          miscellaneous arguments
+#' @param y             another MVRanges
+#' @param varAllele     variant alleles
+#' @param subject       a GRanges, usually 
+#' @param seqSource     a BSgenome, usually 
+#' @param ...           miscellaneous args, passed through
+#' 
 #' @param filterLowQual boolean; drop non-PASSing variants from locateVariants?
 #'
+#' @return              depends on the method invoked.
+#' 
 #' @aliases locateVariants getAnnotations predictCoding genes
 #' @aliases snpCall annotation tallyVariants summarizeVariants
+#'
+#' @import              Homo.sapiens
+#' 
+#' @importFrom          GenomicFeatures   genes
+#' @importFrom          Biobase           snpCall
+#' @importFrom          graphics          plot 
+#'
+#' @importMethodsFrom   VariantAnnotation filt 
+#' @importMethodsFrom   GenomicFeatures   genes
+#' @importMethodsFrom   Biostrings        consensusString type 
+#' @importMethodsFrom   IRanges           coverage
 #' 
 #' @name                MVRanges-methods
 NULL
@@ -62,7 +110,13 @@ NULL
 
 #' @rdname    MVRanges-methods
 #' @export
-setMethod("coverage", signature(x="MVRanges"), function(x) x@coverage)
+setMethod("genomeCoverage", signature(x="MVRanges"), function(x) x@coverage)
+
+
+#' @rdname    MVRanges-methods
+#' @export
+setMethod("coverage", signature(x="MVRanges"), 
+          function(x) callNextMethod()[[1]]) 
 
 
 #' @rdname    MVRanges-methods
@@ -87,7 +141,9 @@ setMethod("snpCall", signature(object="MVRanges"),
 #' @export
 setMethod("pos", signature(x="MVRanges"), 
           function(x) {
-            sapply(apply(cbind(start(x),end(x)),1, unique), paste, collapse="-")
+            .getse <- function(y) cbind(start(y), end(y))
+            .condense <- function(y) paste(unique(y), collapse="_")
+            apply(.getse(granges(x)), 1, .condense)
           })
 
 
@@ -100,7 +156,7 @@ setMethod("show", signature(object="MVRanges"),
             if ("annotation" %in% names(metadata(object))) {
               cat(" (try getAnnotations(object))")
             }
-            cat(paste0(", ~", round(coverage(object)), "x read coverage")) 
+            cat(paste0(", ~",round(genomeCoverage(object)),"x read coverage")) 
             cat("\n")
           })
 
@@ -157,6 +213,7 @@ setMethod("encoding", signature(x="MVRanges"),
 
 
 #' @rdname    MVRanges-methods
+#' @importFrom VariantAnnotation filt
 #' @export
 setMethod("filt", signature(x="MVRanges"), function(x) subset(x, x$PASS==TRUE))
 
@@ -182,6 +239,7 @@ setMethod("locateVariants",
                 "endCodon" %in% names(mcols(query))) {
               return(query) # done 
             }
+            if (length(query) == 0) return(NULL)
 
             data("mtAnno.rCRS", package="MTseeker")
             metadata(query)$annotation <- mtAnno
@@ -230,10 +288,11 @@ setMethod("tallyVariants", signature(x="MVRanges"),
 #' @export
 setMethod("predictCoding", # mitochondrial annotations kept internally
           signature(query="MVRanges", "missing", "missing", "missing"), 
-          function(query, ...) injectMtVariants(filt(query)))
+          function(query, ...) injectMTVariants(filt(query)))
 
 
 #' @rdname    MVRanges-methods
+#' @import    jsonlite
 #' @export
 setMethod("summarizeVariants", signature(query="MVRanges","missing","missing"),
           function(query, ...) {
@@ -248,7 +307,7 @@ setMethod("summarizeVariants", signature(query="MVRanges","missing","missing"),
                 res$protein <- with(res, paste0("p.",AA_ref,AA_position,AA_alt))
                 res$change <- with(res, paste(Gene_symbol, protein))
                 res[, c("genomic","protein","change","APOGEE_boost_consensus",
-                        "MtoolBox","Mitomap_Phenotype","Mitomap_Status",
+                        "MToolBox","Mitomap_Phenotype","Mitomap_Status",
                         "OXPHOS_complex","dbSNP_150_id","Codon_substitution")]
               } else {
                 return(NULL)
@@ -272,4 +331,19 @@ setMethod("summarizeVariants", signature(query="MVRanges","missing","missing"),
 #' @rdname    MVRanges-methods
 #' @export
 setMethod("plot", signature(x="MVRanges"), 
-          function(x, ...) mtCircos(x, ...))
+          function(x, ...) MTcircos(x, ...))
+
+
+#' @rdname    MVRanges-methods
+#' @export
+setMethod("consensusString", signature(x="MVRanges"), 
+          function(x, ...) {
+            supported <- c("rCRS")
+            actual <- unique(genome(x))
+            stopifnot(unique(genome(x)) %in% supported)
+            data(rCRSeq, package="MTseeker")
+            mvr <- snpCall(filt(x)) # gross
+            alts <- DNAStringSet(replaceAt(rCRSeq[[1]], ranges(mvr), alt(mvr)))
+            names(alts) <- actual # genome 
+            return(alts)
+          })

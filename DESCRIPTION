@@ -1,33 +1,53 @@
 Package: MTseeker
 Type: Package
-Title: Bioconductor tools for mitochondrial variant calling
-Version: 0.9.39
-Date: 2018-08-01
-Author: Tim Triche, Jr., Ben Johnson, Tim Vickers, Noor Sohail
-Maintainer: Tim Triche, Jr. <tim.triche@vai.org>
-Description: Variant analysis tools for mitochondria. 
+Title: Bioconductor Tools for Human Mitochondrial Variant Analysis
+Version: 1.3.5
+Author: Tim Triche [cre, aut], Noor Sohail [aut], Ben Johnson [aut], Tim Vickers [ctb], Azif Zubair [ctb]
+Authors@R: c(person("Tim", "Triche", role = c("cre", "aut"),
+                    email = "tim.triche@gmail.com"),
+             person("Noor", "Sohail", role = "aut"),
+             person("Ben", "Johnson", role = "aut"),
+             person("Tim", "Vickers", role = "ctb"),
+             person("Azif", "Zubair", role = "ctb"))
+Maintainer: Tim Triche <tim.triche@gmail.com>
+Description: Variant analysis tools for mitochondrial genetics. 
+biocViews: Genetics, Metabolomics, VariantAnnotation
 Depends:
-    Homo.sapiens,
-    VariantAnnotation,
-    VariantTools,
-    rtracklayer,
-    ggthemes,
-    jsonlite,
-    viridis 
+    viridis,
+    S4Vectors,
+    GenomeInfoDb,
+    GenomicAlignments,
+    VariantAnnotation
 Imports:
     xml2,
+    utils,
     gmapR,
+    methods,
     IRanges,
+    Biobase,
     circlize,
+    jsonlite,
+    graphics,
     Rsamtools,
-    S4Vectors,
+    grDevices,
     Biostrings,
+    rtracklayer,
+    VariantTools,
+    Homo.sapiens,
     BiocGenerics,
     GenomicRanges,
-    GenomicAlignments
+    GenomicFeatures,
+    SummarizedExperiment
 Suggests:
+    MTseekerData,
+    BiocStyle,
+    rmarkdown,
+    ggthemes,
+    ggplot2,
+    pkgdown,
     knitr,
     rsvg
-License: GPL-3.0
-RoxygenNote: 6.1.0
+License: GPL-3
+Encoding: UTF-8 
+RoxygenNote: 6.1.1
 VignetteBuilder: knitr
