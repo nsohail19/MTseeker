@@ -32,15 +32,15 @@
 #' @export
 #'
 pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg38", "GRCm38","C57BL/6J","NC_005089","mm10"), ...) { 
-
+  
   # can support multiple bams if we have sample names
   # perhaps it is worthwhile to autoextract them now
-
+  
   if (is.null(sbp)) sbp <- scanMT(bam) 
   if (is.null(pup)) pup <- PileupParam(distinguish_strands=FALSE) 
   refSeqLengths <- .refSeqLengths() # synonyms 
   ref <- .getRefSyn(match.arg(ref)) # matching 
-
+  
   # scant support for other mitogenomes
   if (!ref %in% names(refSeqLengths)) {
     stop("Only the ", paste(names(refSeqLengths), collapse=" and "),
@@ -50,10 +50,10 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
   } else { 
     pu <- pileup(file=bam, scanBamParam=sbp, pileupParam=pup, ...)
   }
-
+  
   # may be handy for editing 
   refSeqDNA <- .getRefSeq(ref)
-
+  
   # will need to handle '-' and '+' separately 
   indels <- subset(pu, nucleotide %in% c('-', '+'))
   if (nrow(indels) > 0) {
@@ -69,13 +69,13 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
     message("(However, if you debug() this function, indelReads will help.")
   }
   # data(fpFilter_Triska, package="MTseeker") # for when they are... 
- 
+  
   # this may belong in a separate helper function...
   pu <- subset(pu, nucleotide %in% c('A','C','G','T'))
   pu$which_label <- NULL # confusing here 
   pu$ref <-  factor(strsplit(as.character(.getRefSeq(ref)), '')[[1]],
                     levels=levels(pu$nucleotide))[pu$pos]
-
+  
   pu$alt <- pu$nucleotide 
   pu$totalDepth <- .byPos(pu, "count")
   is.na(pu$alt) <- (pu$nucleotide == pu$ref)
@@ -108,6 +108,10 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
   metadata(mvr)$pup <- pup
   mvr$bam <- basename(bam)
   genome(mvr) <- ref
+  
+  # Only want to keep variants that differ from reference
+  keep <- which(!is.na(alt(mvr)))
+  mvr <- mvr[keep]
   return(mvr)
 }
 
@@ -141,7 +145,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
   refSeqLengths["mm10"] <- width(NC_005089seq) 
   refSeqLengths["C57BL/6J"] <- width(NC_005089seq)
   return(refSeqLengths)
-
+  
 }
 
 
@@ -158,11 +162,11 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
 
 # helper fn
 .getRefSeq <- function(ref) { 
-
+  
   data(rCRSeq, package="MTseeker") # human
   data(NC_005089seq, package="MTseeker") # mouse
   refs <- DNAStringSet(c(rCRS=rCRSeq[['chrM']],
                          NC_005089=NC_005089seq[['chrM']]))
   return(refs[.getRefSyn(ref)])
-
+  
 }
