@@ -20,7 +20,7 @@
 #' 
 #' library(MTseekerData)
 #' BAMdir <- system.file("extdata", "BAMs", package="MTseekerData")
-#' BAMs <- paste0(BAMdir, "/", list.files(BAMdir, pattern=".bam$"))
+#' 
 #' bam <- BAMs[1]
 #' 
 #' sbp <- scanMT(bam)
@@ -31,7 +31,25 @@
 #'
 #' @export
 #'
-pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg38", "GRCm38","C57BL/6J","NC_005089","mm10"), ...) { 
+pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg38", "GRCm38","C57BL/6J","NC_005089","mm10"), ...) { 
+
+  # Set the number of cores if running in parallel
+  if (parallel) options(mc.cores = cores)
+  if (parallel & cores == 1) options(mc.cores = detectCores()/2)
+  
+  # If you are working with multiple files
+  if (length(bam) > 1) {
+    
+    if(parallel) {
+      mvrl <- MVRangesList(mclapply(bam, pileupMT, sbp=sbp, ref=ref, parallel=parallel, cores=cores))
+      return(mvrl)
+    }
+    
+    else {
+      mvrl <- MVRangesList(lapply(bam, pileupMT, ref=ref, sbp=sbp))
+      return(mvrl)
+    }
+  }
   
   # can support multiple bams if we have sample names
   # perhaps it is worthwhile to autoextract them now
@@ -86,25 +104,28 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
     # Hopefully this will speed things up with less iteration
     indelReads <- indelReads[indelIndex]
     
-    #browser()
+    if (length(indelIndex) > 500) {
+      message("This may take a while, determining ", length(indelIndex), " variants for ", bam)
+    }
     
     # Returns the ref and alt read for each variant
+    #lapply(indelReads, .reverseCigar, ref=ref)
     for (i in 1:length(indelReads)) {
       indelReads[i] <- .reverseCigar(indelReads[i], ref)
     }
-    
+
     # Converts to a MVRanges
     mvrIndel <- .indelToMVR(indelReads,refSupport, ref) # add refSupport as an argument
-    
+
     # Copied and pasted from below
     mvrIndel$VAF <- altDepth(mvrIndel)/totalDepth(mvrIndel)
     metadata(mvrIndel)$refseq <- .getRefSeq(ref)
-    covg <- rep(0, length(metadata(mvrIndel)$refseq))
     
     ### Not sure how to apply this to the indels
-    #covered <- rowsum(pu$count, pu$pos)
+    #covg <- rep(0, length(metadata(mvrIndel)$refseq))
+    #covered <- rowsum(altDepth(mvrIndel), pos(mvrIndel))
     #covg[as.numeric(rownames(covered))] <- covered 
-    #metadata(mvr)$coverageRle <- Rle(covg)
+    #metadata(mvrIndel)$coverageRle <- Rle(covg)
     
     metadata(mvrIndel)$bam <- basename(bam)
     metadata(mvrIndel)$sbp <- indelSBP
@@ -165,12 +186,13 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
   keep <- which(!is.na(alt(mvr)))
   mvr <- mvr[keep]
   names(mvr) <- MTHGVS(mvr)
-  
-  #browser()
-  
+  browser()
   # Add in the indels
   mvr <- MVRanges(c(mvr, mvrIndel))
   mvr <- sort(mvr)
+  
+  # Not sure how else to establish coverage for the mvr
+  #mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr)))
   
   return(mvr)
 }
@@ -311,7 +333,13 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
         # Make the ref and alt sequences into vectors of characters to look at each character individually
         #refSplit <- unlist(strsplit(as.character(pattern(comp)), split=""))
         
-        ###################################3
+        ###################################
+        
+        # Store the information
+        mcols(indelRead)$indelStart <- startPos
+        mcols(indelRead)$indelEnd <- endPos
+        mcols(indelRead)$alt <- alt
+        mcols(indelRead)$ref <- refs
       } # I
       
       # Deletions
@@ -356,7 +384,6 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
         #show(comp)
         #show(refs)
         #show(alt)
-        #browser()
         ############################################
         
         # Store the information
@@ -446,6 +473,9 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg
   # Recalculate totalDepth
   totalDepth(mvrIndelunique) <- refDepth(mvrIndelunique) + altDepth(mvrIndelunique)
   
-  return(mvrIndelunique)
+  # Want to make sure we keep track of coverage
+  mvr <- MVRanges(mvrIndelunique, coverage = median(rowsum(altDepth(mvrIndel), start(mvrIndel))))
+  
+  return(mvr)
   
 }
