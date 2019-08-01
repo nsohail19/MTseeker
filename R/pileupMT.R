@@ -32,7 +32,7 @@
 #' @export
 #'
 pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg38", "GRCm38","C57BL/6J","NC_005089","mm10"), ...) { 
-
+  
   # Set the number of cores if running in parallel
   if (parallel) options(mc.cores = cores)
   if (parallel & cores == 1) options(mc.cores = detectCores()/2)
@@ -113,6 +113,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     # Returns the ref and alt read for each variant
     #lapply(indelReads, .reverseCigar, ref=ref)
     for (i in 1:length(indelReads)) {
+      if (i == 7) browser()
       indelReads[i] <- .reverseCigar(indelReads[i], ref)
     }
 
@@ -162,10 +163,10 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth")
   gr <- keepSeqlevels(.puToGR(subset(pu, isAlt|alleles==1)[,columns]),
                       unique(pu$seqnames))
-  seqinfo(gr) <- Seqinfo("chrM", width(.getRefSeq(ref)), 
+  seqinfo(gr) <- Seqinfo(levels(seqnames(gr)), width(.getRefSeq(ref)), 
                          isCircular=TRUE, genome=ref)
   vr <- makeVRangesFromGRanges(.puToGR(subset(pu, isAlt|alleles==1)[,columns]))
-  vr <- keepSeqlevels(vr, "chrM") 
+  vr <- keepSeqlevels(vr, levels(seqnames(gr))) 
   seqinfo(vr) <- seqinfo(gr)
   mvr <- MVRanges(vr, coverage=median(rowsum(pu$count, pu$pos)))
   sampleNames(mvr) <- base::sub(paste0(".", ref), "", 
@@ -191,12 +192,15 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   mvr <- mvr[keep]
   names(mvr) <- MTHGVS(mvr)
 
-  # Add in the indels
-  mvr <- MVRanges(c(mvr, mvrIndel))
-  mvr <- sort(mvr)
-  
-  # Not sure how else to establish coverage for the mvr
-  mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
+  # Add in the indels if they exist
+  if (nrow(indels) > 0) {
+    
+    mvr <- MVRanges(c(mvr, mvrIndel))
+    mvr <- sort(mvr)
+    
+    # Not sure how else to establish coverage for the mvr
+    mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
+  }
   
   return(mvr)
 }
@@ -285,7 +289,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     delIndex <- which((grepl("D", splitCigar))) 
     
     # Currently do not support reads that have multiple indels in it
-    if (length(insIndex) > 1 && length(delIndex)) {
+    if (length(insIndex) >= 1 && length(delIndex) >= 1) {
       warning("Insertion and deletion in ", cigar(indelRead), " skipping it...")
       return(indelRead)
     }
