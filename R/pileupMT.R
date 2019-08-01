@@ -104,8 +104,10 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     # Hopefully this will speed things up with less iteration
     indelReads <- indelReads[indelIndex]
     
+    message("Tallying indels for: ", bam)
+    
     if (length(indelIndex) > 500) {
-      message("This may take a while, determining ", length(indelIndex), " variants for ", bam)
+      message("This may take a while, determining ", length(indelIndex), " indel reads for ", bam)
     }
     
     # Returns the ref and alt read for each variant
@@ -141,6 +143,8 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     #message("(However, if you debug() this function, indelReads will help.")
   }
   # data(fpFilter_Triska, package="MTseeker") # for when they are... 
+  
+  message("Tallying SNPs for: ", bam)
   
   # this may belong in a separate helper function...
   pu <- subset(pu, nucleotide %in% c('A','C','G','T'))
@@ -186,13 +190,13 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   keep <- which(!is.na(alt(mvr)))
   mvr <- mvr[keep]
   names(mvr) <- MTHGVS(mvr)
-  browser()
+
   # Add in the indels
   mvr <- MVRanges(c(mvr, mvrIndel))
   mvr <- sort(mvr)
   
   # Not sure how else to establish coverage for the mvr
-  #mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr)))
+  mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
   
   return(mvr)
 }
@@ -276,125 +280,165 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     splitCigar <- gsub("([[:digit:]]+[[:alpha:]])", "\\1 ", cigar(indelRead))
     splitCigar <- unlist(strsplit(splitCigar, " "))
     
-    for (i in 1:length(splitCigar)) {
+    # Find the insertion or deletion
+    insIndex <- which((grepl("I", splitCigar))) 
+    delIndex <- which((grepl("D", splitCigar))) 
+    
+    # Currently do not support reads that have multiple indels in it
+    if (length(insIndex) > 1 && length(delIndex)) {
+      warning("Insertion and deletion in ", cigar(indelRead), " skipping it...")
+      return(indelRead)
+    }
+    
+    if (length(insIndex) > 1 || length(delIndex) > 1) {
+      warning("More than one insertion or deletion in ", cigar(indelRead), " skipping it...")
+      return(indelRead)
+    }
+    
+    # There is an insertion
+    if (length(insIndex)) {
       
-      # Soft clippings are ignored
-      if (grepl("S", splitCigar[i])) softPos <- softPos + as.numeric(gsub("\\D", "", splitCigar[i]))
+      # Find the number of base pairs that are soft clips
+      # Only want to look at the information before the insertion
+      softPos <- which(grepl("S", splitCigar[1:insIndex]))
+      softPos <- as.numeric(gsub("\\D", "", splitCigar[softPos]))
+      if (length(softPos) == 0) {
+        softPos <- 0
+      }
       
-      # Matched reads
-      if (grepl("M", splitCigar[i])) {
-        addPos <- addPos + as.numeric(gsub("\\D", "", splitCigar[i]))
-      } # M
+      # Find the number of base pairs that are matches
+      # Only want to look at the information before the insertion
+      addPos <- which(grepl("M", splitCigar[1:insIndex]))
+      addPos <- as.numeric(gsub("\\D", "", splitCigar[addPos]))
+      if (length(addPos) == 0) {
+        addPos <- 0
+      }
       
-      # Insertions
-      if (grepl("I", splitCigar[i])) {
-        
-        # Create range for the deletion
-        startPos <- start(indelRead) + addPos
-        
-        # Deal with the off by one error for the start of the range
-        if (softPos == 0) {  
-          startPos <- startPos - 1
-        }
-        
-        # According to VRanges documentation, insertions have width=1 soooo
-        endPos <- startPos
-        
-        # Length of insertion
-        insLength <- as.numeric(gsub("\\D", "", splitCigar[i]))
-
-        # Get the reference
-        refs <- extractAt(reference, IRanges(startPos, endPos))
-        refs <- unname(as.character(unlist(refs)))
-        
-        # Get the alt sequence from the raw read
-        altSeq <- as.character(mcols(indelRead)$seq)
-        altSplit <- unlist(strsplit(altSeq, split=""))
-        
-        altIndex <- seq(addPos, addPos + insLength, 1)
-        alt <- altSplit[altIndex]
-        alt <- paste(alt, collapse="")
-        
-        ################################
-        # SANITY CHECKS
-        
-        #testRef <- extractAt(reference, IRanges(startPos, startPos))
-        #testRef <- as.character(unlist(testRef))
-        
-        # Get the corresponding ref sequence
-        #refRange <- IRanges(start(indelRead) - softPos, end(indelRead))
-        #refSeq <- as.character(unlist(extractAt(reference, refRange)))
-        
-        # Compare the two strings
-        # Tried doing this using positions based upon cigar string but sometimes got off by one errors
-        #comp <- pairwiseAlignment(refSeq, altSeq)
-        #show(comp)
-        
-        # Make the ref and alt sequences into vectors of characters to look at each character individually
-        #refSplit <- unlist(strsplit(as.character(pattern(comp)), split=""))
-        
-        ###################################
-        
-        # Store the information
-        mcols(indelRead)$indelStart <- startPos
-        mcols(indelRead)$indelEnd <- endPos
-        mcols(indelRead)$alt <- alt
-        mcols(indelRead)$ref <- refs
-      } # I
+      ## This is where the actual insertion stuff occurs
+      # Create range for the deletion
+      startPos <- start(indelRead) + addPos
       
-      # Deletions
-      if (grepl("D", splitCigar[i])) {
-        
-        # Create range for the deletion
-        startPos <- start(indelRead) + addPos
-        
-        # These appear to cause one off errors for the start of the range
-        testRef <- extractAt(reference, IRanges(startPos, startPos))
-        testRef <- as.character(unlist(testRef))
-        if (testRef == "N" || softPos == 0) {  ## THROW OUT ALL Ns and if deletion is length 1 #rCRS:m.3107del
-          startPos <- startPos - 1
-        }
-        
-        endPos <- startPos + as.numeric(gsub("\\D", "", splitCigar[i]))
-        
-        # Get the reference
-        refs <- extractAt(reference, IRanges(startPos, endPos))
-        refs <- unname(as.character(unlist(refs)))
-        
-        # Do the deletion
-        # Since we are subtracting 1, we are deleting all of the sequences that come after the start
-        # So we just want to keep the first sequence
-        alt <- extractAt(reference, IRanges(startPos, startPos))
-        alt <- unname(unstrsplit(CharacterList(alt)))
-        
-        ##########################################
-        # Just a manual check for my own sanity to make sure that this works
-        
-        # Get the alt sequence 
-        #altSeq <- as.character(mcols(indelRead)$seq)
-        
-        # Get the corresponding ref sequence
-        #refRange <- IRanges(start(indelRead) - softPos, end(indelRead))
-        #refSeq <- as.character(unlist(extractAt(reference, refRange)))
-        
-        # Compare the two strings
-        # Tried doing this using positions based upon cigar string but sometimes got off by one errors
-        #comp <- pairwiseAlignment(refSeq, altSeq)
-        
-        #show(comp)
-        #show(refs)
-        #show(alt)
-        ############################################
-        
-        # Store the information
-        mcols(indelRead)$indelStart <- startPos
-        mcols(indelRead)$indelEnd <- endPos
-        mcols(indelRead)$alt <- alt
-        mcols(indelRead)$ref <- refs
-        
-      } # D
-    } # for
-  } # Else
+      # Deal with the off by one error for the start of the range
+      if (softPos == 0) {  
+        startPos <- startPos - 1
+      }
+      
+      # According to VRanges documentation, insertions have width=1 soooo
+      endPos <- startPos
+      
+      # Length of insertion
+      insLength <- as.numeric(gsub("\\D", "", splitCigar[insIndex]))
+      
+      # Get the reference
+      refs <- extractAt(reference, IRanges(startPos, endPos))
+      refs <- unname(as.character(unlist(refs)))
+      
+      # Get the alt sequence from the raw read
+      altSeq <- as.character(mcols(indelRead)$seq)
+      altSplit <- unlist(strsplit(altSeq, split=""))
+      
+      altIndex <- seq(addPos, addPos + insLength, 1)
+      alt <- altSplit[altIndex]
+      alt <- paste(alt, collapse="")
+      
+      ################################
+      # SANITY CHECKS
+      
+      #testRef <- extractAt(reference, IRanges(startPos, startPos))
+      #testRef <- as.character(unlist(testRef))
+      
+      # Get the corresponding ref sequence
+      #refRange <- IRanges(start(indelRead) - softPos, end(indelRead))
+      #refSeq <- as.character(unlist(extractAt(reference, refRange)))
+      
+      # Compare the two strings
+      # Tried doing this using positions based upon cigar string but sometimes got off by one errors
+      #comp <- pairwiseAlignment(refSeq, altSeq)
+      #show(comp)
+      
+      # Make the ref and alt sequences into vectors of characters to look at each character individually
+      #refSplit <- unlist(strsplit(as.character(pattern(comp)), split=""))
+      
+      ###################################
+      
+      # Store the information
+      mcols(indelRead)$indelStart <- startPos
+      mcols(indelRead)$indelEnd <- endPos
+      mcols(indelRead)$alt <- alt
+      mcols(indelRead)$ref <- refs
+      
+    }
+    
+    else if (length(delIndex)) {
+      
+      # Find the number of base pairs that are soft clips
+      # Only want to look at the information before the delection
+      softPos <- which(grepl("S", splitCigar[1:delIndex]))
+      softPos <- as.numeric(gsub("\\D", "", splitCigar[softPos]))
+      if (length(softPos) == 0) {
+        softPos <- 0
+      }
+      
+      # Find the number of base pairs that are matches
+      # Only want to look at the information before the deletion
+      addPos <- which(grepl("M", splitCigar[1:delIndex]))
+      addPos <- as.numeric(gsub("\\D", "", splitCigar[addPos]))
+      if (length(addPos) == 0) {
+        addPos <- 0
+      }
+      
+      ## This is where the actual deletion takes place
+      # Create range for the deletion
+      startPos <- start(indelRead) + addPos
+      
+      # These appear to cause one off errors for the start of the range
+      testRef <- extractAt(reference, IRanges(startPos, startPos))
+      testRef <- as.character(unlist(testRef))
+      if (testRef == "N" || softPos == 0) {  ## THROW OUT ALL Ns and if deletion is length 1 #rCRS:m.3107del
+        startPos <- startPos - 1
+      }
+      
+      endPos <- startPos + as.numeric(gsub("\\D", "", splitCigar[delIndex]))
+      
+      # Get the reference
+      refs <- extractAt(reference, IRanges(startPos, endPos))
+      refs <- unname(as.character(unlist(refs)))
+      
+      # Do the deletion
+      # Since we are subtracting 1, we are deleting all of the sequences that come after the start
+      # So we just want to keep the first sequence
+      alt <- extractAt(reference, IRanges(startPos, startPos))
+      alt <- unname(unstrsplit(CharacterList(alt)))
+      
+      ##########################################
+      # Just a manual check for my own sanity to make sure that this works
+      
+      # Get the alt sequence 
+      #altSeq <- as.character(mcols(indelRead)$seq)
+      
+      # Get the corresponding ref sequence
+      #refRange <- IRanges(start(indelRead) - softPos, end(indelRead))
+      #refSeq <- as.character(unlist(extractAt(reference, refRange)))
+      
+      # Compare the two strings
+      # Tried doing this using positions based upon cigar string but sometimes got off by one errors
+      #comp <- pairwiseAlignment(refSeq, altSeq)
+      
+      #show(comp)
+      #show(refs)
+      #show(alt)
+      ############################################
+      
+      # Store the information
+      mcols(indelRead)$indelStart <- startPos
+      mcols(indelRead)$indelEnd <- endPos
+      mcols(indelRead)$alt <- alt
+      mcols(indelRead)$ref <- refs
+       
+    } # D
+    
+  } # Else 
+  
   return(indelRead)
 }
 
