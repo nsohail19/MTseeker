@@ -105,7 +105,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     indelReads <- indelReads[indelIndex]
     
     message("Tallying indels for: ", bam)
-    
+
     if (length(indelIndex) > 500) {
       message("This may take a while, determining ", length(indelIndex), " indel reads for ", bam)
     }
@@ -113,12 +113,11 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     # Returns the ref and alt read for each variant
     #lapply(indelReads, .reverseCigar, ref=ref)
     for (i in 1:length(indelReads)) {
-      if (i == 7) browser()
       indelReads[i] <- .reverseCigar(indelReads[i], ref)
     }
 
     # Converts to a MVRanges
-    mvrIndel <- .indelToMVR(indelReads,refSupport, ref) # add refSupport as an argument
+    mvrIndel <- .indelToMVR(indelReads,refSupport, ref, bam) 
 
     # Copied and pasted from below
     mvrIndel$VAF <- altDepth(mvrIndel)/totalDepth(mvrIndel)
@@ -163,6 +162,8 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth")
   gr <- keepSeqlevels(.puToGR(subset(pu, isAlt|alleles==1)[,columns]),
                       unique(pu$seqnames))
+  
+  # seqnames for mouse genome is "MT" 
   seqinfo(gr) <- Seqinfo(levels(seqnames(gr)), width(.getRefSeq(ref)), 
                          isCircular=TRUE, genome=ref)
   vr <- makeVRangesFromGRanges(.puToGR(subset(pu, isAlt|alleles==1)[,columns]))
@@ -448,7 +449,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
 
 # helper fn
 # Will make turn the indel information into a MVRanges
-.indelToMVR <- function(indelReads, refSupport, ref) {
+.indelToMVR <- function(indelReads, refSupport, ref, bam) {
   
   # This is mostly copied and pasted from the mvr created at the end of pileup
   indelSupport <- which(!is.na(mcols(indelReads)$alt))
@@ -472,10 +473,10 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   # Turn into granges then turn into vranges
   columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth")
   grIndel <- keepSeqlevels(.puToGR(subset(indelSupport, isAlt==1)[,columns]), unique(indelSupport$seqnames))
-  seqinfo(grIndel) <- Seqinfo("chrM", width(.getRefSeq(ref)), isCircular=TRUE, genome=ref)
+  seqinfo(grIndel) <- Seqinfo(levels(seqnames(grIndel)), width(.getRefSeq(ref)), isCircular=TRUE, genome=ref)
   
   vrIndel <- makeVRangesFromGRanges(.puToGR(subset(indelSupport, isAlt==1)[,columns]))
-  vrIndel <- keepSeqlevels(vrIndel, "chrM") 
+  vrIndel <- keepSeqlevels(vrIndel, levels(seqnames(grIndel))) 
   seqinfo(vrIndel) <- seqinfo(grIndel)
   
   # Skipped this coverage step
@@ -510,9 +511,10 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   #refSupport <- indelReads[refSupport]
   
   # Need to keep order in mind, since not every indel has a read supporting the reference
+  # Sets the refDepth to corresponding index that is matched
   ov <- findOverlaps(refSupport, mvrIndelunique)
   refCount <- table(subjectHits(ov))
-  refDepth(mvrIndelunique[as.numeric(names(refCount))]) <- unname(refCount)
+  refDepth(mvrIndelunique[as.numeric(names(refCount))]) <- as.numeric(unname(refCount))
   
   # Replace NA's with 0s for refDepth to properly calculate totalDepth
   noRef <- which(is.na(refDepth(mvrIndelunique)))
@@ -522,8 +524,9 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   totalDepth(mvrIndelunique) <- refDepth(mvrIndelunique) + altDepth(mvrIndelunique)
   
   # Want to make sure we keep track of coverage
-  mvr <- MVRanges(mvrIndelunique, coverage = median(rowsum(altDepth(mvrIndel), start(mvrIndel))))
-  
+  ### NOT SURE HOW TO KEEP TRACK OF THE COVERAGE
+  #mvr <- MVRanges(mvrIndelunique, coverage = median(rowsum(altDepth(mvrIndel), start(mvrIndel))))
+  mvr <- MVRanges(mvrIndelunique)
   return(mvr)
   
 }
