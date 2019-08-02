@@ -32,7 +32,7 @@
 #' @export
 #'
 pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg38", "GRCm38","C57BL/6J","NC_005089","mm10"), ...) { 
-  
+
   # Set the number of cores if running in parallel
   if (parallel) options(mc.cores = cores)
   if (parallel & cores == 1) options(mc.cores = detectCores()/2)
@@ -68,8 +68,8 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   } else { 
     pu <- pileup(file=bam, scanBamParam=sbp, pileupParam=pup, ...)
   }
-  
-  # may be handy for editing 
+
+    # may be handy for editing 
   refSeqDNA <- .getRefSeq(ref)
   
   # will need to handle '-' and '+' separately 
@@ -113,7 +113,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     # Returns the ref and alt read for each variant
     #lapply(indelReads, .reverseCigar, ref=ref)
     for (i in 1:length(indelReads)) {
-      indelReads[i] <- .reverseCigar(indelReads[i], ref)
+      indelReads[i] <- .reverseCigar(indelReads[i], ref, refSeqDNA)
     }
 
     # Converts to a MVRanges
@@ -121,7 +121,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
 
     # Copied and pasted from below
     mvrIndel$VAF <- altDepth(mvrIndel)/totalDepth(mvrIndel)
-    metadata(mvrIndel)$refseq <- .getRefSeq(ref)
+    metadata(mvrIndel)$refseq <- refSeqDNA
     
     ### Not sure how to apply this to the indels
     #covg <- rep(0, length(metadata(mvrIndel)$refseq))
@@ -145,11 +145,11 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   # data(fpFilter_Triska, package="MTseeker") # for when they are... 
   
   message("Tallying SNPs for: ", bam)
-  
+
   # this may belong in a separate helper function...
   pu <- subset(pu, nucleotide %in% c('A','C','G','T'))
   pu$which_label <- NULL # confusing here 
-  pu$ref <-  factor(strsplit(as.character(.getRefSeq(ref)), '')[[1]],
+  pu$ref <-  factor(strsplit(as.character(refSeqDNA), '')[[1]],
                     levels=levels(pu$nucleotide))[pu$pos]
   
   pu$alt <- pu$nucleotide 
@@ -164,7 +164,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
                       unique(pu$seqnames))
   
   # seqnames for mouse genome is "MT" 
-  seqinfo(gr) <- Seqinfo(levels(seqnames(gr)), width(.getRefSeq(ref)), 
+  seqinfo(gr) <- Seqinfo(levels(seqnames(gr)), width(refSeqDNA), 
                          isCircular=TRUE, genome=ref)
   vr <- makeVRangesFromGRanges(.puToGR(subset(pu, isAlt|alleles==1)[,columns]))
   vr <- keepSeqlevels(vr, levels(seqnames(gr))) 
@@ -177,7 +177,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   altDepth(mvr)[is.na(altDepth(mvr))] <- 0
   
   mvr$VAF <- altDepth(mvr)/totalDepth(mvr)
-  metadata(mvr)$refseq <- .getRefSeq(ref)
+  metadata(mvr)$refseq <- refSeqDNA
   covg <- rep(0, length(metadata(mvr)$refseq))
   covered <- rowsum(pu$count, pu$pos)
   covg[as.numeric(rownames(covered))] <- covered 
@@ -200,9 +200,9 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     mvr <- sort(mvr)
     
     # Not sure how else to establish coverage for the mvr
-    mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
+    #mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
   }
-  
+
   return(mvr)
 }
 
@@ -264,7 +264,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
 
 # helper fn
 # Will take a single read and return the reference and alternative sequence
-.reverseCigar <- function(indelRead, ref) {
+.reverseCigar <- function(indelRead, ref, reference) {
   
   # These are reads that support the reference
   if ( (!grepl("I", cigar(indelRead))) && (!grepl("D", cigar(indelRead))) ) {
@@ -280,7 +280,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     # Add soft clippings
     softPos <- 0
     
-    reference <- .getRefSeq(ref)
+    #reference <- .getRefSeq(ref)
     
     splitCigar <- gsub("([[:digit:]]+[[:alpha:]])", "\\1 ", cigar(indelRead))
     splitCigar <- unlist(strsplit(splitCigar, " "))
