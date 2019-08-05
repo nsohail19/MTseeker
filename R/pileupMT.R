@@ -157,46 +157,61 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   pu$alt <- pu$nucleotide 
   pu$totalDepth <- .byPos(pu, "count")
   is.na(pu$alt) <- (pu$nucleotide == pu$ref)
-  pu$altDepth <- ifelse(is.na(pu$alt), NA_integer_, pu$count) 
-  pu$refDepth <- pu$totalDepth - .byPos(pu, "altDepth")
-  pu$isAlt <- !is.na(pu$alt)
-  pu$alleles <- .byPos(pu, "isAlt") + 1 
-  columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth")
-  gr <- keepSeqlevels(.puToGR(subset(pu, isAlt|alleles==1)[,columns]),
-                      unique(pu$seqnames))
-  
-  # seqnames for mouse genome is "MT" 
-  seqinfo(gr) <- Seqinfo(levels(seqnames(gr)), width(refSeqDNA), 
-                         isCircular=TRUE, genome=ref)
-  vr <- makeVRangesFromGRanges(.puToGR(subset(pu, isAlt|alleles==1)[,columns]))
-  vr <- keepSeqlevels(vr, levels(seqnames(gr))) 
-  seqinfo(vr) <- seqinfo(gr)
-  mvr <- MVRanges(vr, coverage=median(rowsum(pu$count, pu$pos)))
-  sampleNames(mvr) <- base::sub(paste0(".", ref), "", 
-                                base::sub(".bam", "", 
-                                          basename(bam)))
-  names(mvr)[which(mvr$ref != mvr$alt)] <- MTHGVS(subset(mvr, ref != alt)) 
-  altDepth(mvr)[is.na(altDepth(mvr))] <- 0
-  
-  mvr$VAF <- altDepth(mvr)/totalDepth(mvr)
-  metadata(mvr)$refseq <- refSeqDNA
-  covg <- rep(0, length(metadata(mvr)$refseq))
-  covered <- rowsum(pu$count, pu$pos)
-  covg[as.numeric(rownames(covered))] <- covered 
-  metadata(mvr)$coverageRle <- Rle(covg)
-  metadata(mvr)$bam <- basename(bam)
-  metadata(mvr)$sbp <- sbp
-  metadata(mvr)$pup <- pup
-  mvr$bam <- basename(bam)
-  genome(mvr) <- ref
-  
+  browser()
   # Only want to keep variants that differ from reference
-  keep <- which(!is.na(alt(mvr)))
-  mvr <- mvr[keep]
-  names(mvr) <- MTHGVS(mvr)
-
-  # Add in the indels if they exist
-  if (nrow(indels) > 0) {
+  keep <- which(!is.na(pu$alt))
+  pu <- pu[keep,]
+  
+  # There are no indels and SNPs
+  if (nrow(pu) == 0 && nrow(indels) == 0) {
+    return(NULL)
+  }
+  
+  # If there are no SNPs but there are indels
+  if (nrow(pu) == 0 && nrow(indels) == 0 ) {
+    return(mvrIndel)
+  }
+  
+  # If there exists SNPs 
+  if (nrow(pu) != 0) {
+   
+    pu$altDepth <- ifelse(is.na(pu$alt), NA_integer_, pu$count) 
+    pu$refDepth <- pu$totalDepth - .byPos(pu, "altDepth")
+    pu$isAlt <- !is.na(pu$alt)
+    pu$alleles <- .byPos(pu, "isAlt") + 1 
+    columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth")
+    gr <- keepSeqlevels(.puToGR(subset(pu, isAlt|alleles==1)[,columns]),
+                        unique(pu$seqnames))
+    
+    # seqnames for mouse genome is "MT" 
+    seqinfo(gr) <- Seqinfo(levels(seqnames(gr)), width(refSeqDNA), 
+                           isCircular=TRUE, genome=ref)
+    vr <- makeVRangesFromGRanges(.puToGR(subset(pu, isAlt|alleles==1)[,columns]))
+    vr <- keepSeqlevels(vr, levels(seqnames(gr))) 
+    seqinfo(vr) <- seqinfo(gr)
+    mvr <- MVRanges(vr, coverage=median(rowsum(pu$count, pu$pos)))
+    sampleNames(mvr) <- base::sub(paste0(".", ref), "", 
+                                  base::sub(".bam", "", 
+                                            basename(bam)))
+    names(mvr)[which(mvr$ref != mvr$alt)] <- MTHGVS(subset(mvr, ref != alt)) 
+    altDepth(mvr)[is.na(altDepth(mvr))] <- 0
+    browser()
+    mvr$VAF <- altDepth(mvr)/totalDepth(mvr)
+    metadata(mvr)$refseq <- refSeqDNA
+    covg <- rep(0, length(metadata(mvr)$refseq))
+    covered <- rowsum(pu$count, pu$pos)
+    covg[as.numeric(rownames(covered))] <- covered 
+    metadata(mvr)$coverageRle <- Rle(covg)
+    metadata(mvr)$bam <- basename(bam)
+    metadata(mvr)$sbp <- sbp
+    metadata(mvr)$pup <- pup
+    mvr$bam <- basename(bam)
+    genome(mvr) <- ref
+     
+  }
+  
+  # Merge indels and SNPs together if both exist
+  if (nrow(indels) > 0 && nrow(pu) != 0) {
     
     mvr <- MVRanges(c(mvr, mvrIndel))
     mvr <- sort(mvr)
