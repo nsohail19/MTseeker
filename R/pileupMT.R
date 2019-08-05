@@ -157,7 +157,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   pu$alt <- pu$nucleotide 
   pu$totalDepth <- .byPos(pu, "count")
   is.na(pu$alt) <- (pu$nucleotide == pu$ref)
-  browser()
+
   # Only want to keep variants that differ from reference
   keep <- which(!is.na(pu$alt))
   pu <- pu[keep,]
@@ -195,7 +195,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
                                             basename(bam)))
     names(mvr)[which(mvr$ref != mvr$alt)] <- MTHGVS(subset(mvr, ref != alt)) 
     altDepth(mvr)[is.na(altDepth(mvr))] <- 0
-    browser()
+
     mvr$VAF <- altDepth(mvr)/totalDepth(mvr)
     metadata(mvr)$refseq <- refSeqDNA
     covg <- rep(0, length(metadata(mvr)$refseq))
