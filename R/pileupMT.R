@@ -68,7 +68,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   } else { 
     pu <- pileup(file=bam, scanBamParam=sbp, pileupParam=pup, ...)
   }
-
+  
     # may be handy for editing 
   refSeqDNA <- .getRefSeq(ref)
   
@@ -125,6 +125,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     mvrIndel$VAF <- altDepth(mvrIndel)/totalDepth(mvrIndel)
     metadata(mvrIndel)$refseq <- refSeqDNA
     
+    browser() 
     ### Not sure how to apply this to the indels
     #covg <- rep(0, length(metadata(mvrIndel)$refseq))
     #covered <- rowsum(altDepth(mvrIndel), pos(mvrIndel))
@@ -204,7 +205,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     # Not sure how else to establish coverage for the mvr
     #mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
   }
-
+  
   return(mvr)
 }
 
