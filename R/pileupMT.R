@@ -32,7 +32,7 @@
 #' @export
 #'
 pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rCRS","GRCh37","GRCh38","hg38", "GRCm38","C57BL/6J","NC_005089","mm10"), ...) { 
-
+  
   # Set the number of cores if running in parallel
   if (parallel) options(mc.cores = cores)
   if (parallel & cores == 1) options(mc.cores = detectCores()/2)
@@ -162,13 +162,13 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   keep <- which(!is.na(pu$alt))
   pu <- pu[keep,]
   
-  # There are no indels and SNPs
+  # There are no indels and no SNPs
   if (nrow(pu) == 0 && nrow(indels) == 0) {
     return(NULL)
   }
   
   # If there are no SNPs but there are indels
-  if (nrow(pu) == 0 && nrow(indels) == 0 ) {
+  else if (nrow(pu) == 0 && nrow(indels) > 0 ) {
     return(mvrIndel)
   }
   
