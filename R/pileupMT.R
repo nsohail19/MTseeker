@@ -125,7 +125,6 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     mvrIndel$VAF <- altDepth(mvrIndel)/totalDepth(mvrIndel)
     metadata(mvrIndel)$refseq <- refSeqDNA
     
-    browser() 
     ### Not sure how to apply this to the indels
     #covg <- rep(0, length(metadata(mvrIndel)$refseq))
     #covered <- rowsum(altDepth(mvrIndel), pos(mvrIndel))
