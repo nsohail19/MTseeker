@@ -208,6 +208,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     mvr$bam <- basename(bam)
     genome(mvr) <- ref
      
+    names(mvr) <- MTHGVS(mvr)
   }
   
   # Merge indels and SNPs together if both exist
@@ -215,6 +216,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     
     mvr <- MVRanges(c(mvr, mvrIndel))
     mvr <- sort(mvr)
+    names(mvr) <- MTHGVS(mvr)
     
     # Not sure how else to establish coverage for the mvr
     #mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
