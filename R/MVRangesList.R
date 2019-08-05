@@ -295,7 +295,6 @@ setMethod("consensusString", signature(x="MVRangesList"),
 # helper fn
 .extractCoverageRles <- function(...) { 
   if ("coverageRle" %in% .extractCommonElts(...)) {
-    browser()
     df <- lapply(lapply(lapply(..., metadata), `[[`, "coverageRle"), DataFrame)
     return(df)
   } else { 
