@@ -72,6 +72,16 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     # may be handy for editing 
   refSeqDNA <- .getRefSeq(ref)
   
+  # Need the total number of reads in order to calculate coverage
+  readsSBP <- sbp
+  bamWhat(readsSBP) <- "seq"
+  reads <- readGAlignments(file=bam, param=readsSBP)
+  numReads <- length(reads)
+  readsWidth <- median(qwidth(reads)) - 1
+  
+  # number of reads * length of reads / length of ref sequence
+  covg <- round(numReads * readsWidth / width(refSeqDNA))
+  
   # will need to handle '-' and '+' separately 
   indels <- subset(pu, nucleotide %in% c('-', '+'))
   if (nrow(indels) > 0) {
@@ -119,7 +129,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     }
     
     # Converts to a MVRanges
-    mvrIndel <- .indelToMVR(newIndelReads,refSupport, ref, bam) 
+    mvrIndel <- .indelToMVR(newIndelReads,refSupport, ref, bam, covg) 
 
     # Copied and pasted from below
     mvrIndel$VAF <- altDepth(mvrIndel)/totalDepth(mvrIndel)
@@ -164,11 +174,12 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   
   # There are no indels and no SNPs
   if (nrow(pu) == 0 && nrow(indels) == 0) {
-    return(MVRanges(GRanges(c(seqnames=NULL,ranges=NULL,strand=NULL)) ))
+    return(MVRanges(GRanges(c(seqnames=NULL,ranges=NULL,strand=NULL)) ), coverage = covg)
   }
   
   # If there are no SNPs but there are indels
   else if (nrow(pu) == 0 && nrow(indels) > 0 ) {
+    metadata(mvrIndel)$coverageRle <- coverage(mvrIndel)
     return(mvrIndel)
   }
   
@@ -189,7 +200,8 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     vr <- makeVRangesFromGRanges(.puToGR(subset(pu, isAlt|alleles==1)[,columns]))
     vr <- keepSeqlevels(vr, levels(seqnames(gr))) 
     seqinfo(vr) <- seqinfo(gr)
-    mvr <- MVRanges(vr, coverage=median(rowsum(pu$count, pu$pos)))
+    #mvr <- MVRanges(vr, coverage=median(rowsum(pu$count, pu$pos)))
+    mvr <- MVRanges(vr, coverage=covg)
     sampleNames(mvr) <- base::sub(paste0(".", ref), "", 
                                   base::sub(".bam", "", 
                                             basename(bam)))
@@ -198,10 +210,10 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
 
     mvr$VAF <- altDepth(mvr)/totalDepth(mvr)
     metadata(mvr)$refseq <- refSeqDNA
-    covg <- rep(0, length(metadata(mvr)$refseq))
-    covered <- rowsum(pu$count, pu$pos)
-    covg[as.numeric(rownames(covered))] <- covered 
-    metadata(mvr)$coverageRle <- Rle(covg)
+    #covg <- rep(0, length(metadata(mvr)$refseq))
+    #covered <- rowsum(pu$count, pu$pos)
+    #covg[as.numeric(rownames(covered))] <- covered 
+    #metadata(mvr)$coverageRle <- Rle(covg)
     metadata(mvr)$bam <- basename(bam)
     metadata(mvr)$sbp <- sbp
     metadata(mvr)$pup <- pup
@@ -214,7 +226,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   # Merge indels and SNPs together if both exist
   if (nrow(indels) > 0 && nrow(pu) != 0) {
     
-    mvr <- MVRanges(c(mvr, mvrIndel))
+    mvr <- MVRanges(c(mvr, mvrIndel), coverage=covg)
     mvr <- sort(mvr)
     names(mvr) <- MTHGVS(mvr)
     
@@ -222,6 +234,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
     #mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
   }
   
+  metadata(mvr)$coverageRle <- coverage(mvr)
   return(mvr)
 }
 
@@ -464,7 +477,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
 
 # helper fn
 # Will make turn the indel information into a MVRanges
-.indelToMVR <- function(indelReads, refSupport, ref, bam) {
+.indelToMVR <- function(indelReads, refSupport, ref, bam, covg) {
   
   # This is mostly copied and pasted from the mvr created at the end of pileup
   indelSupport <- which(!is.na(mcols(indelReads)$alt))
@@ -499,7 +512,7 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   #mvr <- MVRanges(vr, coverage=median(rowsum(pu$count, pu$pos)))
   
   # Turn into mvranges
-  mvrIndel <- MVRanges(vrIndel)
+  mvrIndel <- MVRanges(vrIndel, coverage = covg)
   sampleNames(mvrIndel) <- base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(bam)))
   
   # Fix ranges
@@ -541,7 +554,9 @@ pileupMT <- function(bam, sbp=NULL, parallel=FALSE, cores=1, pup=NULL, ref=c("rC
   # Want to make sure we keep track of coverage
   ### NOT SURE HOW TO KEEP TRACK OF THE COVERAGE
   #mvr <- MVRanges(mvrIndelunique, coverage = median(rowsum(altDepth(mvrIndel), start(mvrIndel))))
-  mvr <- MVRanges(mvrIndelunique)
+  mvr <- MVRanges(mvrIndelunique, coverage = covg)
   return(mvr)
   
 }
+
+
