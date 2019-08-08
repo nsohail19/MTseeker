@@ -186,7 +186,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   
   # There are no indels and no SNPs
   if (nrow(pu) == 0 && nrow(indels) == 0) {
-    return(MVRanges(GRanges(c(seqnames=NULL,ranges=NULL,strand=NULL)) ), coverage = covg)
+    return(MVRanges(GRanges(c(seqnames=NULL,ranges=NULL,strand=NULL)), coverage = covg))
   }
   
   # If there are no SNPs but there are indels
