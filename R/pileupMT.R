@@ -93,6 +93,9 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   
   # number of reads * length of reads / length of ref sequence
   covg <- round(numReads * readsWidth / width(refSeqDNA))
+  if (is.na(covg)) covg <- 0
+  
+  browser()
   
   # will need to handle '-' and '+' separately 
   indels <- subset(pu, nucleotide %in% c('-', '+'))
