@@ -64,11 +64,23 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     
     if(parallel) {
       mvrl <- MVRangesList(mclapply(bam, pileupMT, sbp=sbp, ref=ref, parallel=parallel, cores=cores))
+      
+      ### THIS WILL BREKAK IF YOU FEED IT EMPTY MVRANGES
+      ### FIX LATER
+      sampNames <- unlist(lapply(mvrl, function(x) unique(as.character(sampleNames(x)))))
+      names(mvrl) <- sampNames
+      
       return(mvrl)
     }
     
     else {
       mvrl <- MVRangesList(lapply(bam, pileupMT, ref=ref, sbp=sbp))
+      
+      ### THIS WILL BREKAK IF YOU FEED IT EMPTY MVRANGES
+      ### FIX LATER
+      sampNames <- unlist(lapply(mvrl, function(x) unique(as.character(sampleNames(x)))))
+      names(mvrl) <- sampNames
+      
       return(mvrl)
     }
   }
@@ -246,7 +258,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     # Not sure how else to establish coverage for the mvr
     #mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
   }
-  
+
   metadata(mvr)$coverageRle <- coverage(mvr)
   return(mvr)
 }
