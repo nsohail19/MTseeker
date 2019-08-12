@@ -11,14 +11,14 @@
 #' @return      elements of x over features on each strand OR x split by strand 
 #' 
 #' @examples
+#' data(mtAnno.rCRS)
+#' anno <- mtAnno
 #' data(RONKSvariants, package="MTseekerData")
-#' byStrand(RONKSvariants)
+#' byStrand(RONKSvariants, anno)
 #' 
 #' @export 
 byStrand <- function(x, anno) { 
-
-  browser()
-
+  
   stranded <- split(anno, strand(anno))[c("+", "-")]
   names(stranded) <- c("heavy", "light")
   

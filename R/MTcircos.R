@@ -35,31 +35,16 @@
 MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL, 
                      incol=NULL, anno=NULL, how=c("matrix","VAF"), ...) {
 
+  browser()
+  
   circos.clear() 
-  data(mtAnno.rCRS)
-  if (is.null(anno)) anno <- mtAnno #.rCRS
-  pfun <- function(x, y) {
-    xlim <- CELL_META$xlim
-    ylim <- CELL_META$ylim
-    gr <- anno[CELL_META$sector.index]
-    ytop <- .height(gr) * ifelse(strand(gr) == "+", 1, 0)
-    ybot <- .height(gr) * ifelse(strand(gr) == "-", -1, 0)
-    lab <- ifelse(CELL_META$sector.index == "DLP", "CR", CELL_META$sector.index)
-    circos.rect(xlim[1], ybot, xlim[2], ytop, col=gr$itemRgb)
-    if (gr$region %in% c("rRNA", "coding", "D-loop") & gr$name != "HVR3") {
-      circos.text(mean(xlim), .textloc(gr), lab, col="black", cex=.textcex(gr),
-                  font=.textbold(gr), facing="clockwise", niceFacing=TRUE)
-    }
-  }
+  
+  anno <- initMTcircos(variants)
   dat <- data.frame(name=names(anno), start=start(anno), end=end(anno))
-  circos.par("clock.wise"=FALSE, "start.degree"=90, "gap.degree"=0, 
-             "track.margin"=c(0.005, 0.005), "cell.padding"=c(0.005,0,0.005,0), 
-             "points.overflow.warning"=FALSE)
-  circos.genomicInitialize(data=dat, plotType=NULL, major.by=16569)
 
   if (!is.null(variants)) {
     message("Splitting variants by strand...")
-    stranded <- byStrand(variants)
+    stranded <- byStrand(variants, anno)
     message("Replacing `outside` with heavy-strand variants...")
     outside <- stranded$heavy
     message("Replacing `inside` with light-strand variants...")
@@ -78,8 +63,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   }
   
   # main track, gene names and such
-  circos.track(panel.fun=pfun, ylim=c(-1,1), track.height=0.5, 
-               track.margin=c(0,0), bg.border=NA)
+  genesMTcircos(variants, anno)
 
   # inside track: 
   if (!is.null(inside)) {
@@ -94,8 +78,6 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   res <- list(anno=dat, pfun=pfun)
   invisible(res)
 }
-
-
 
 
 # helper fn

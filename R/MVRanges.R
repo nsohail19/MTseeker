@@ -229,6 +229,7 @@ setMethod("genome", signature(x="MVRanges"),
 setMethod("locateVariants", 
           signature(query="MVRanges","missing","missing"),
           function(query, filterLowQual=FALSE, ...) {
+            
             if (filterLowQual == TRUE) query <- filt(query)
             if ("gene" %in% names(mcols(query)) &
                 "region" %in% names(mcols(query)) &
@@ -240,7 +241,9 @@ setMethod("locateVariants",
             }
             if (length(query) == 0) return(NULL)
             
-            data("mtAnno.rCRS", package="MTseeker")
+            if (genome(query) == "rCRS") data(mtAnno.rCRS)
+            else if (genome(query) == "NC_005089") mtAnno <- readRDS("~/Documents/pileupTesting/NC_005089genome/MTmouseAnno.rds")
+            
             metadata(query)$annotation <- mtAnno
             
             ol <- findOverlaps(query, mtAnno, ignore.strand=TRUE)
