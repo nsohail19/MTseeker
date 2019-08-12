@@ -15,12 +15,9 @@
 #' byStrand(RONKSvariants)
 #' 
 #' @export 
-byStrand <- function(x, anno=NULL) { 
+byStrand <- function(x, anno) { 
 
-  if (is.null(anno)) {
-    data(mtAnno.rCRS)
-    anno <- mtAnno
-  }
+  browser()
 
   stranded <- split(anno, strand(anno))[c("+", "-")]
   names(stranded) <- c("heavy", "light")
