@@ -34,7 +34,6 @@
 #' @export 
 MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL, 
                      incol=NULL, anno=NULL, how=c("matrix","VAF"), ...) {
-
   circos.clear() 
   
   anno <- initMTcircos(variants)
@@ -113,7 +112,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
 .mvrToBed <- function(mvr) { 
 
   message("This will take a moment")
-  
+  browser()
   # Iterate through each variant and call locateVariant
   newMvr <- locateVariants(mvr[1])
   for (i in 2:length(mvr)) {
