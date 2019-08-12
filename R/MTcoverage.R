@@ -106,7 +106,6 @@ plotStrandedMTCoverage <- function(x, ...) {
     stop("Unable to plot stranded coverage for mice right now")
   }
   
-  browser()
   circos.clear()
   
   anno <- initMTcircos(x)

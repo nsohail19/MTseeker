@@ -45,6 +45,9 @@ genesMTcircos <- function(x, anno) {
   
   circos.track(panel.fun=pfun, ylim=c(-1,1), track.height=0.5, 
                track.margin=c(0,0), bg.border=NA)
+  
+  res <- list(anno=dat, pfun=pfun)
+  return(res)
 }
 
 # helper fn
@@ -70,7 +73,8 @@ genesMTcircos <- function(x, anno) {
 
 # helper fn
 .colorCode <- function(x, darken=TRUE, howMuch=1.25) { 
-  color <- anno[x]$itemRgb
+  data("mtAnno.rCRS", package="MTseeker")
+  color <- mtAnno[x]$itemRgb
   if (darken) color <- .darken(color, howMuch=howMuch)
   return(color)
 }

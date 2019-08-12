@@ -60,7 +60,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   }
   
   # main track, gene names and such
-  genesMTcircos(variants, anno)
+  res <- genesMTcircos(variants, anno)
   
   # inside track: 
   if (!is.null(inside)) {
@@ -72,31 +72,9 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
     circos.track(track.height=0.15, ylim=c(0,1), bg.border=NA)
   }
   
-  res <- list(anno=dat, pfun=pfun)
   invisible(res)
 }
 
-
-# helper fn
-.height <- function(gr) ifelse(gr$region == "tRNA", 0.5, 1)
-
-# helper fn
-.halfheight <- function(gr) gr$region == "tRNA"
-
-# helper fn
-.textloc <- function(gr) {
-  ifelse(.halfheight(gr), .25, .5) * ifelse(strand(gr) == "+", 1, -1)
-}
-
-# helper fn
-.textbold <- function(gr) ifelse(gr$region %in% c("coding", "rRNA"), 3, 1)
-
-# helper fn
-.textcex <- function(gr) { 
-  ifelse(gr$name %in% c("HVR1","HVR2","MT-ATP8"), .65,
-         ifelse(gr$name %in% c("MT-ND3","MT-ND4L","MT-ND6","MT-CO2","MT-CO3",
-                               "MT-RNR1","MT-RNR2","MT-ATP8","MT-ATP6"),.8,.95))
-}
 
 # helper fn
 .makeBed <- function(x) {
@@ -129,7 +107,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
 
 # helper fn
 .mvrlToBed <- function(mvrl) { 
-  browser()
+
   gr <- granges(mvrl, filterLowQual=FALSE)
   bed <- as.data.frame(gr)
   bed <- bed[, c(6, 2, 3, 8:(ncol(bed)))]
@@ -142,37 +120,3 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   bed$value <- 1
   return(bed)
 }
-
-# helper fn
-.colorCode <- function(x, darken=TRUE, howMuch=1.25) { 
-  data("mtAnno.rCRS", package="MTseeker")
-  color <- mtAnno[x]$itemRgb
-  if (darken) color <- .darken(color, howMuch=howMuch)
-  return(color)
-}
-
-# helper fn
-.darken <- function(hex, howMuch=1.25) {
-  rgb(t(col2rgb(hex)/howMuch), maxColorValue=255)
-}
-
-# helper fn
-.newsprint <- colorRamp2(c(0, 1), c("#FFFFFF", "#000000"))
-
-# helper fn
-.bloody <- colorRamp2(c(0, 1), c("#FFFFFF", "#880000"))
-
-# helper fn
-.blurple <- colorRamp2(c(0, 1), c("#FFFFFF", "#FF00FF"))
-
-# helper fn
-.viridis <- colorRamp2(seq(0, 1, by = 0.1), viridis(11))
-
-# helper fn
-.plasma <- colorRamp2(seq(0, 1, by = 0.1), plasma(11))
-
-# helper fn; should probably use viridis instead 
-.jet <- colorRamp2(seq(0, 1, 0.125),
-                   c("#00007F", "blue", "#007FFF", "cyan",
-                     "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))
-
