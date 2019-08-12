@@ -35,8 +35,6 @@
 MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL, 
                      incol=NULL, anno=NULL, how=c("matrix","VAF"), ...) {
 
-  browser()
-  
   circos.clear() 
   
   anno <- initMTcircos(variants)
