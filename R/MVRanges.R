@@ -165,12 +165,12 @@ setMethod("show", signature(object="MVRanges"),
 #' @export
 setMethod("annotation", signature(object="MVRanges"), 
           function(object) {
-
+            
             if (!"annotation" %in% names(metadata(object))) {
               data(mtAnno.rCRS)
               metadata(object)$annotation <- mtAnno
             }
-
+            
             anno <- getAnnotations(object)
             ol <- findOverlaps(object, anno)
             object$gene <- NA_character_
@@ -178,7 +178,7 @@ setMethod("annotation", signature(object="MVRanges"),
             object$region <- NA_character_
             object[queryHits(ol)]$region <- anno[subjectHits(ol)]$region
             return(object)
-
+            
           })
 
 # previously defined in chromvar
@@ -202,13 +202,13 @@ setMethod("getAnnotations", signature(annotations="MVRanges"),
 #' @export
 setMethod("encoding", signature(x="MVRanges"), 
           function(x) {
-
+            
             # limit the search 
             x <- locateVariants(x) 
             x <- subset(x, region == "coding") 
             chrM <- grep("(MT|chrM|rCRS|RSRS)", seqlevelsInUse(x), value=TRUE)
             return(keepSeqlevels(x, chrM, pruning.mode="coarse"))
-
+            
           })
 
 
@@ -229,7 +229,6 @@ setMethod("genome", signature(x="MVRanges"),
 setMethod("locateVariants", 
           signature(query="MVRanges","missing","missing"),
           function(query, filterLowQual=FALSE, ...) {
-            
             if (filterLowQual == TRUE) query <- filt(query)
             if ("gene" %in% names(mcols(query)) &
                 "region" %in% names(mcols(query)) &
@@ -241,9 +240,7 @@ setMethod("locateVariants",
             }
             if (length(query) == 0) return(NULL)
             
-            if (genome(query) == "rCRS") data(mtAnno.rCRS)
-            else if (genome(query) == "NC_005089") mtAnno <- readRDS("~/Documents/pileupTesting/NC_005089genome/MTmouseAnno.rds")
-            
+            data("mtAnno.rCRS", package="MTseeker")
             metadata(query)$annotation <- mtAnno
             
             ol <- findOverlaps(query, mtAnno, ignore.strand=TRUE)
@@ -318,10 +315,10 @@ setMethod("locateVariants",
 #' @export
 setMethod("tallyVariants", signature(x="MVRanges"), 
           function(x, filterLowQual=TRUE, ...) {
-
+            
             located <- locateVariants(x, filterLowQual=filterLowQual)
             table(located$region)
-
+            
           })
 
 
@@ -337,7 +334,7 @@ setMethod("predictCoding", # mitochondrial annotations kept internally
 #' @export
 setMethod("summarizeVariants", signature(query="MVRanges","missing","missing"),
           function(query, ...) {
-          
+            
             # helper function  
             getImpact <- function(pos) {
               url <- paste("http://mitimpact.css-mendel.it", "api", "v2.0",
@@ -354,18 +351,18 @@ setMethod("summarizeVariants", signature(query="MVRanges","missing","missing"),
                 return(NULL)
               }
             }
-
+            
             hits <- lapply(pos(encoding(query)), getImpact)
             hits <- hits[which(sapply(hits, length) > 0)] 
-
+            
             # be precise, if possible
             for (h in names(hits)) {
               j <- hits[[h]]
               if (h %in% j$genomic) hits[[h]] <- j[which(j$genomic == h),]
             }
-
+            
             do.call(rbind, hits)
-
+            
           })
 
 

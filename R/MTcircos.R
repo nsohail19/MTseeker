@@ -38,7 +38,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   
   anno <- initMTcircos(variants)
   dat <- data.frame(name=names(anno), start=start(anno), end=end(anno))
-
+  
   if (!is.null(variants)) {
     message("Splitting variants by strand...")
     stranded <- byStrand(variants, anno)
@@ -47,7 +47,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
     message("Replacing `inside` with light-strand variants...")
     inside <- stranded$light
   } 
-
+  
   # outside track: variant annotations (use granges() if outside is an MVRL)
   if (!is.null(outside)) {
     bed1 <- .makeBed(outside)
@@ -61,7 +61,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   
   # main track, gene names and such
   genesMTcircos(variants, anno)
-
+  
   # inside track: 
   if (!is.null(inside)) {
     bed2 <- .makeBed(inside)
@@ -71,7 +71,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   } else { 
     circos.track(track.height=0.15, ylim=c(0,1), bg.border=NA)
   }
-
+  
   res <- list(anno=dat, pfun=pfun)
   invisible(res)
 }
@@ -110,9 +110,9 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
 
 # helper fn
 .mvrToBed <- function(mvr) { 
-
+  
   message("This will take a moment")
-  browser()
+
   # Iterate through each variant and call locateVariant
   newMvr <- locateVariants(mvr[1])
   for (i in 2:length(mvr)) {
@@ -129,7 +129,8 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
 
 # helper fn
 .mvrlToBed <- function(mvrl) { 
-  gr <- granges(mvrl)
+  browser()
+  gr <- granges(mvrl, filterLowQual=FALSE)
   bed <- as.data.frame(gr)
   bed <- bed[, c(6, 2, 3, 8:(ncol(bed)))]
   return(bed)

@@ -143,7 +143,7 @@ setMethod("show", signature(object="MVRangesList"),
             if ("counts" %in% names(metadata(object))) {
               peaks <- nrow(metadata(object)$counts)
               cat(ifelse("bias" %in% names(rowData(counts(object))),
-                  "Bias-corrected ", "Raw "))
+                         "Bias-corrected ", "Raw "))
               cat("fragment counts at", peaks, "peaks are available from",
                   "counts(object).\n")
             }
@@ -168,7 +168,7 @@ setMethod("filt", signature(x="MVRangesList"),
 #' @export
 setMethod("granges", signature(x="MVRangesList"),
           function(x, filterLowQual=TRUE) {
-
+            
             # if cached...
             if (filterLowQual == TRUE & 
                 "granges.filtered" %in% names(metadata(x))) {
@@ -179,24 +179,28 @@ setMethod("granges", signature(x="MVRangesList"),
             }
 
             # if not...
-            if (filterLowQual == TRUE) x <- filt(x) 
+            #if (filterLowQual == TRUE) x <- filt(x) 
             anno <- suppressMessages(getAnnotations(x))
+            
             message("Aggregating variants...")
-            gr <- unlist(as(x, "GRangesList")) 
+            gr <- GRanges(unlist(x))
             gr <- keepSeqlevels(gr, "chrM", pruning.mode="coarse")
             gr <- reduce(gr)
             ol <- findOverlaps(gr, anno)
             metadata(gr)$annotation <- anno
             metadata(gr)$sampleNames <- names(x)
+            
             message("Annotating variants by region...")
             gr$gene <- NA_character_
             gr[queryHits(ol)]$gene <- names(anno)[subjectHits(ol)] 
             gr$region <- NA_character_
             gr[queryHits(ol)]$region <- anno[subjectHits(ol)]$region
+            
             message("Annotating variants by sample...") 
             hitMat <- matrix(0, ncol=length(x), nrow=length(gr),
                              dimnames=list(NULL, names(x)))
-            varHits <- findOverlaps(as(x, "GRangesList"), gr)
+            xgrl <- GRangesList(lapply(mvrl, GRanges))
+            varHits <- findOverlaps(xgrl, gr)
             bySample <- split(subjectHits(varHits), queryHits(varHits))
             for (s in seq_along(bySample)) hitMat[bySample[[s]], s] <- 1
             mcols(gr)$overlaps <- hitMat 
@@ -232,7 +236,7 @@ setMethod("summarizeVariants",
                 return(NULL)
               }
             }
-
+            
             gr <- granges(query, filterLowQual=filterLowQual, ...)
             names(gr) <- as.character(gr)
             message("Retrieving functional annotations for variants...")
@@ -244,7 +248,7 @@ setMethod("summarizeVariants",
             res <- makeGRangesFromDataFrame(rsv, keep.extra.columns=TRUE)
             seqinfo(res) <- seqinfo(gr)
             return(res)
-
+            
           })
 
 
@@ -259,11 +263,11 @@ setMethod("genome", signature(x="MVRangesList"),
 setMethod("locateVariants", 
           signature(query="MVRangesList","missing","missing"),
           function(query, filterLowQual=TRUE, ...) {
-
+            
             stop("Don't use this method for now. It has bugs!")
             if (filterLowQual == TRUE) query <- filt(query)
             MVRangesList(lapply(query, locateVariants))
-
+            
           })
 
 
@@ -280,8 +284,8 @@ setMethod("consensusString", signature(x="MVRangesList"),
             actual <- unique(genome(x))
             res <- DNAStringSet(lapply(lapply(x, consensusString), `[[`, 1))
             names(res) <- paste(sapply(x, function(y) 
-                                as.character(unique(sampleNames(y)))), 
-                                actual, sep=".")
+              as.character(unique(sampleNames(y)))), 
+              actual, sep=".")
             return(res)
           })
 
@@ -311,4 +315,3 @@ setMethod("consensusString", signature(x="MVRangesList"),
     return(NULL)
   }
 }
-

@@ -69,7 +69,7 @@ genesMTcircos <- function(x, anno) {
 }
 
 # helper fn
-.colorCode <- function(x, anno, darken=TRUE, howMuch=1.25) { 
+.colorCode <- function(x, darken=TRUE, howMuch=1.25) { 
   color <- anno[x]$itemRgb
   if (darken) color <- .darken(color, howMuch=howMuch)
   return(color)
