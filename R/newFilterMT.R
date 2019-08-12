@@ -41,8 +41,6 @@
 newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
                          minCovg=20, fpFilter=FALSE, NuMT=FALSE, verbose=FALSE) {
   
-  browser()
-  
   if (is(vars, "MVRangesList")) {
     
     # Since this is a very customizable function
@@ -80,7 +78,6 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
     
     else {
       
-      browser()
       # Only keep variants with a minimum altDept and totalDepth as specified by the user
       vars <- subset(vars, !is.na(altDepth(vars)) & altDepth(vars) >= minAltDepth)
       vars <- subset(vars, !is.na(totalDepth(vars)) & totalDepth(vars) >= minTotalDepth)
@@ -142,7 +139,7 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
 # helper fn
 # More complicated filter for rCRS ref genome
 .rCRSfilter <- function(vars, fp=TRUE, NuMT=TRUE, minTotalDepth=20, minAltDepth=2) {
-  
+
   # False positive filter
   if (fp) {
     data(fpFilter_Triska, package="MTseeker")
@@ -156,7 +153,8 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
   
   # Only keep variants with an altDept of at least minAltDepth
   vars <- subset(vars, !is.na(altDepth(vars)) & altDepth(vars) >= minAltDepth)
-
+  vars <- subset(vars, !is.na(totalDepth(vars)) & totalDepth(vars) >= minTotalDepth)
+  
   # Nuclear contamination
   if (NuMT) {
     vars <- subset(subsetByOverlaps(vars, fpFilter), VAF >= 0.03)
