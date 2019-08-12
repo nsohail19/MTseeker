@@ -199,7 +199,7 @@ setMethod("granges", signature(x="MVRangesList"),
             message("Annotating variants by sample...") 
             hitMat <- matrix(0, ncol=length(x), nrow=length(gr),
                              dimnames=list(NULL, names(x)))
-            xgrl <- GRangesList(lapply(mvrl, GRanges))
+            xgrl <- GRangesList(lapply(x, GRanges))
             varHits <- findOverlaps(xgrl, gr)
             bySample <- split(subjectHits(varHits), queryHits(varHits))
             for (s in seq_along(bySample)) hitMat[bySample[[s]], s] <- 1
