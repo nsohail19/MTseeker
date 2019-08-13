@@ -4,7 +4,7 @@
 \alias{byStrand}
 \title{simple helper function to split a *RangesList by the strand of its mt target}
 \usage{
-byStrand(x, anno = NULL)
+byStrand(x, anno)
 }
 \arguments{
 \item{x}{a *Ranges[List] or *Alignments[List]}
@@ -21,7 +21,9 @@ retrieves ranges/variant calls that overlap genic elements on the heavy and
 light strands of the mitochondrial genome.
 }
 \examples{
+data(mtAnno.rCRS)
+anno <- mtAnno
 data(RONKSvariants, package="MTseekerData")
-byStrand(RONKSvariants)
+byStrand(RONKSvariants, anno)
 
 }
