@@ -118,16 +118,9 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     bamWhat(indelSBP) <- "seq"
     indelReads <- readGAlignments(file=bam, param=indelSBP)
     
-    # Initialize to get the alternative sequences
-    mcols(indelReads)$indelStart <- NA_integer_
-    mcols(indelReads)$indelEnd <- NA_integer_
-    
-    mcols(indelReads)$ref <- NA_character_
-    mcols(indelReads)$alt <- NA_character_
-    
     # Get the reads the physically contain the insertion and deletions
-    indelIndex <- which(grepl("D|I", cigar(indelReads)))
-    
+    indelIndex <- grep("D|I", cigar(indelReads))
+
     # Every other read will support the reference
     everything <- seq(1, length(indelReads), 1)
     refIndex <- which(is.na(match(everything, indelIndex)))
@@ -137,14 +130,20 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     # Hopefully this will speed things up with less iteration
     indelReads <- indelReads[indelIndex]
     
+    # Initialize to get the alternative sequences
+    mcols(indelReads)$indelStart <- NA_integer_
+    mcols(indelReads)$indelEnd <- NA_integer_
+    
+    mcols(indelReads)$ref <- NA_character_
+    mcols(indelReads)$alt <- NA_character_
+    
     message("Tallying indels for: ", bam)
 
     if (length(indelIndex) > 500) {
       message("This may take a while, determining ", length(indelIndex), " reads for indels from ", bam)
     }
     
-    # Create new data structure
-    # Have to do this because sometimes an indelRead will have multiple indels within the read
+    # Empty GAlignment that will have new indels appended to it
     newIndelReads <- indelReads[0]
 
     # Returns the ref and alt read for each variant
@@ -152,7 +151,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     for (i in 1:length(indelReads)) {
       newIndelReads <- append(newIndelReads, .reverseCigar(indelReads[i], ref, refSeqDNA, i))
     }
-    
+     
     # Converts to a MVRanges
     mvrIndel <- .indelToMVR(newIndelReads,refSupport, ref, bam, covg) 
 
@@ -187,13 +186,12 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   
   # There are no indels and no SNPs
   if (nrow(pu) == 0 && nrow(indels) == 0) {
-    return(MVRanges(GRanges(c(seqnames=NULL,ranges=NULL,strand=NULL)), coverage = covg))
+    mvr <- MVRanges(GRanges(c(seqnames=NULL,ranges=NULL,strand=NULL)), coverage = covg)
   }
   
   # If there are no SNPs but there are indels
   else if (nrow(pu) == 0 && nrow(indels) > 0 ) {
-    metadata(mvrIndel)$coverageRle <- coverage(mvrIndel)
-    return(mvrIndel)
+    mvr <- mvrIndel
   }
   
   # If there exists SNPs 
@@ -237,14 +235,14 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   if (nrow(indels) > 0 && nrow(pu) != 0) {
     
     mvr <- MVRanges(c(mvr, mvrIndel), coverage=covg)
-    mvr <- sort(mvr)
+    mvr <- sort(mvr, ignore.strand=T)
     names(mvr) <- MTHGVS(mvr)
   }
 
   metadata(mvr)$coverageRle <- coverage(mvr)
+  sampleNames(mvr) <- base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(bam)))
   return(mvr)
 }
-
 
 # helper fn
 .byPos <- function(x, y) { 
@@ -303,7 +301,6 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
 # helper fn
 # Will take a single read and return the reference and alternative sequence
-#.reverseCigar <- function(indelRead, ref, reference) {
 .reverseCigar <- function(indelRead, ref, reference, index) {
 
   # These are reads that support the reference (no indels found in them)
@@ -350,7 +347,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
       # Add when there is a deletion
       # Subtract when there is an insertion
       if (i != 1) {
-        #browser()
+        # 
         # Indices or previous insertions or deletions in the same read
         prevIns <- which(grepl("I", splitCigar[1: (indelIndex[i] - 1) ]))
         prevDel <- which(grepl("D", splitCigar[1: (indelIndex[i] - 1) ]))
@@ -378,7 +375,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         # Add to the reference with previous deletion (insertions do not exist in the reference)
         # Add to the alternate with previous insertion (deletions do not add length to the alternate)
         if (i != 1) {
-          #browser()
+          # 
           startPos <- startPos + prevDelSum
           altIndexStart <- altIndexStart + prevInsSum
         }
@@ -425,7 +422,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         # Multiple indels
         # Must take into consideration how the start and end values will change
         if (i != 1) {
-          #browser()
+          # 
           startPos <- startPos + prevDelSum
           altIndexStart <- altIndexStart + prevInsSum
         }
@@ -488,38 +485,30 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 .indelToMVR <- function(indelReads, refSupport, ref, bam, covg) {
   
   # This is mostly copied and pasted from the mvr created at the end of pileup
-  indelSupport <- which(!is.na(mcols(indelReads)$alt))
-  indelSupport <- indelReads[indelSupport]
-  indelSupport <- as.data.frame(indelSupport)
+  indelSupport <- as.data.frame(indelReads)
   
   indelSupport$which_label <- NULL
   
+  # Set these columns to be able to turn into a GRanges
   indelSupport$refDepth <- NA_integer_
   indelSupport$altDepth <- 1
   indelSupport$totalDepth <- 1
-  
-  indelSupport$isAlt <- TRUE
+  indelSupport$pos <- indelSupport$indelStart
   
   ### Not sure what this line is supposed to do
   #pu$alleles <- .byPos(pu, "isAlt") + 1 
-  
-  #### DO I WANT TO DO THIS??
-  indelSupport$pos <- as.numeric(indelSupport$indelStart)
-  
-  # Turn into granges then turn into vranges
+
+  # Turn into GRanges
   columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth")
-  grIndel <- keepSeqlevels(.puToGR(subset(indelSupport, isAlt==1)[,columns]), unique(indelSupport$seqnames))
+  grIndel <- keepSeqlevels(.puToGR(indelSupport[,columns]), unique(indelSupport$seqnames))
   seqinfo(grIndel) <- Seqinfo(levels(seqnames(grIndel)), width(.getRefSeq(ref)), isCircular=TRUE, genome=ref)
   
-  vrIndel <- makeVRangesFromGRanges(.puToGR(subset(indelSupport, isAlt==1)[,columns]))
+  # Turn into VRanges
+  vrIndel <- makeVRangesFromGRanges(grIndel)
   vrIndel <- keepSeqlevels(vrIndel, levels(seqnames(grIndel))) 
   seqinfo(vrIndel) <- seqinfo(grIndel)
   
-  # Skipped this coverage step
-  ### IS THAT ALRIGHT?
-  #mvr <- MVRanges(vr, coverage=median(rowsum(pu$count, pu$pos)))
-  
-  # Turn into mvranges
+  # Turn into MVRanges
   mvrIndel <- MVRanges(vrIndel, coverage = covg)
   sampleNames(mvrIndel) <- base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(bam)))
   
@@ -528,40 +517,23 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   ranges(mvrIndel) <- indelRanges
   
   # Assign names
-  names(mvrIndel)[which(ref(mvrIndel) != alt(mvrIndel))] <- MTHGVS(subset(mvrIndel, ref != alt)) 
-  
+  names(mvrIndel) <- MTHGVS(mvrIndel) 
+
   # Only keep unique variants (based upon names that were just assigned)
-  mvrIndelunique <- unique(mvrIndel)
+  mvrIndelunique <- sort(unique(mvrIndel), ignore.strand=T)
   
   # Assign altDepths based upon what was unique
-  # Sometimes the order gets mixed up, so gotta keep track of that
+  # Sometimes the order gets mixed up, so keep track of it
   order <- match(names(mvrIndelunique), names(table(names(mvrIndel))))
   count <- unname(table(names(mvrIndel))[order])
   altDepth(mvrIndelunique) <- count
   
-  # Now have to get the refDepth from indelReads that were all matched
-  # Added this as an argument to speed up processes
-  
-  #refDepth(mvrIndelunique) <- 0
-  #refSupport <- which(is.na(mcols(indelReads)$alt))
-  #refSupport <- indelReads[refSupport]
-  
-  # Need to keep order in mind, since not every indel has a read supporting the reference
-  # Sets the refDepth to corresponding index that is matched
-  ov <- findOverlaps(refSupport, mvrIndelunique)
-  refCount <- table(subjectHits(ov))
-  refDepth(mvrIndelunique[as.numeric(names(refCount))]) <- as.numeric(unname(refCount))
-  
-  # Replace NA's with 0s for refDepth to properly calculate totalDepth
-  noRef <- which(is.na(refDepth(mvrIndelunique)))
-  refDepth(mvrIndelunique[noRef]) <- 0
+  # Determine the refDepth
+  refDepth(mvrIndelunique) <- unname(countOverlaps(mvrIndelunique, refSupport))
   
   # Recalculate totalDepth
   totalDepth(mvrIndelunique) <- refDepth(mvrIndelunique) + altDepth(mvrIndelunique)
   
-  # Want to make sure we keep track of coverage
-  ### NOT SURE HOW TO KEEP TRACK OF THE COVERAGE
-  #mvr <- MVRanges(mvrIndelunique, coverage = median(rowsum(altDepth(mvrIndel), start(mvrIndel))))
   mvr <- MVRanges(mvrIndelunique, coverage = covg)
   return(mvr)
   
