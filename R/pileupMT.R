@@ -184,19 +184,9 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   keep <- which(!is.na(pu$alt))
   pu <- pu[keep,]
   
-  # There are no indels and no SNPs
-  if (nrow(pu) == 0 && nrow(indels) == 0) {
-    mvr <- MVRanges(GRanges(c(seqnames=NULL,ranges=NULL,strand=NULL)), coverage = covg)
-  }
-  
-  # If there are no SNPs but there are indels
-  else if (nrow(pu) == 0 && nrow(indels) > 0 ) {
-    mvr <- mvrIndel
-  }
-  
-  # If there exists SNPs 
+  # If there exists SNPs, turn the pu into MVRanges
   if (nrow(pu) != 0) {
-   
+    
     pu$altDepth <- ifelse(is.na(pu$alt), NA_integer_, pu$count) 
     pu$refDepth <- pu$totalDepth - .byPos(pu, "altDepth")
     pu$isAlt <- !is.na(pu$alt)
@@ -218,21 +208,32 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
                                             basename(bam)))
     names(mvr)[which(mvr$ref != mvr$alt)] <- MTHGVS(subset(mvr, ref != alt)) 
     altDepth(mvr)[is.na(altDepth(mvr))] <- 0
-
+    
     mvr$VAF <- altDepth(mvr)/totalDepth(mvr)
     metadata(mvr)$refseq <- refSeqDNA
-
+    
     metadata(mvr)$bam <- basename(bam)
     metadata(mvr)$sbp <- sbp
     metadata(mvr)$pup <- pup
     mvr$bam <- basename(bam)
     genome(mvr) <- ref
-     
+    
     names(mvr) <- MTHGVS(mvr)
   }
   
+  # There are no indels and no SNPs
+  # Create an empty MVRanges
+  if (nrow(pu) == 0 && nrow(indels) == 0) {
+    mvr <- MVRanges(GRanges(c(seqnames=NULL,ranges=NULL,strand=NULL)), coverage = covg)
+  }
+  
+  # If there are no SNPs but there are indels
+  else if (nrow(pu) == 0 && nrow(indels) > 0 ) {
+    mvr <- mvrIndel
+  }
+  
   # Merge indels and SNPs together if both exist
-  if (nrow(indels) > 0 && nrow(pu) != 0) {
+  else if (nrow(indels) > 0 && nrow(pu) != 0) {
     
     mvr <- MVRanges(c(mvr, mvrIndel), coverage=covg)
     mvr <- sort(mvr, ignore.strand=T)
