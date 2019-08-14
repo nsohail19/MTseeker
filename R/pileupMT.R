@@ -140,7 +140,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     message("Tallying indels for: ", bam)
 
     if (length(indelIndex) > 500) {
-      message("This may take a while, determining ", length(indelIndex), " indel reads for ", bam)
+      message("This may take a while, determining ", length(indelIndex), " reads for indels from ", bam)
     }
     
     # Create new data structure
@@ -148,9 +148,9 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     newIndelReads <- indelReads[0]
 
     # Returns the ref and alt read for each variant
-    #lapply(indelReads, .reverseCigar, ref=ref)
+    #lapply(indelReads, .reverseCigar, ref=ref, reference=refSeqDNA)
     for (i in 1:length(indelReads)) {
-      newIndelReads <- append(newIndelReads, .reverseCigar(indelReads[i], ref, refSeqDNA))
+      newIndelReads <- append(newIndelReads, .reverseCigar(indelReads[i], ref, refSeqDNA, i))
     }
     
     # Converts to a MVRanges
@@ -160,24 +160,12 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     mvrIndel$VAF <- altDepth(mvrIndel)/totalDepth(mvrIndel)
     metadata(mvrIndel)$refseq <- refSeqDNA
     
-    ### Not sure how to apply this to the indels
-    #covg <- rep(0, length(metadata(mvrIndel)$refseq))
-    #covered <- rowsum(altDepth(mvrIndel), pos(mvrIndel))
-    #covg[as.numeric(rownames(covered))] <- covered 
-    #metadata(mvrIndel)$coverageRle <- Rle(covg)
-    
     metadata(mvrIndel)$bam <- basename(bam)
     metadata(mvrIndel)$sbp <- indelSBP
     metadata(mvrIndel)$pup <- pup
     mvrIndel$bam <- basename(bam)
     genome(mvrIndel) <- ref
     
-    # cigar(indelReads)
-    # 
-    
-    
-    #message("Warning: indels are not currently supported in pileupMT()")
-    #message("(However, if you debug() this function, indelReads will help.")
   }
   # data(fpFilter_Triska, package="MTseeker") # for when they are... 
   
@@ -235,10 +223,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
     mvr$VAF <- altDepth(mvr)/totalDepth(mvr)
     metadata(mvr)$refseq <- refSeqDNA
-    #covg <- rep(0, length(metadata(mvr)$refseq))
-    #covered <- rowsum(pu$count, pu$pos)
-    #covg[as.numeric(rownames(covered))] <- covered 
-    #metadata(mvr)$coverageRle <- Rle(covg)
+
     metadata(mvr)$bam <- basename(bam)
     metadata(mvr)$sbp <- sbp
     metadata(mvr)$pup <- pup
@@ -254,9 +239,6 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     mvr <- MVRanges(c(mvr, mvrIndel), coverage=covg)
     mvr <- sort(mvr)
     names(mvr) <- MTHGVS(mvr)
-    
-    # Not sure how else to establish coverage for the mvr
-    #mvr <- MVRanges(mvr, coverage=median(altDepth(mvr), start(mvr), na.rm=T))
   }
 
   metadata(mvr)$coverageRle <- coverage(mvr)
@@ -321,154 +303,155 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
 # helper fn
 # Will take a single read and return the reference and alternative sequence
-.reverseCigar <- function(indelRead, ref, reference) {
-  
-  # These are reads that support the reference
+#.reverseCigar <- function(indelRead, ref, reference) {
+.reverseCigar <- function(indelRead, ref, reference, index) {
+
+  # These are reads that support the reference (no indels found in them)
   if ( (!grepl("I", cigar(indelRead))) && (!grepl("D", cigar(indelRead))) ) {
-    return(indelRead)
-    #print("All matched")
+    return(indelRead[0])
   }
   
   else {
     
     # Keep track of how many base pairs are being added in the cigar string
-    addPos <- 0 # Matches
-    softPos <- 0 # Soft clips
-    
-    #reference <- .getRefSeq(ref)
+    addPos <- 0 # Matches (M in cigar strings)
+    softPos <- 0 # Soft clips (S in cigar strings)
     
     splitCigar <- gsub("([[:digit:]]+[[:alpha:]])", "\\1 ", cigar(indelRead))
     splitCigar <- unlist(strsplit(splitCigar, " "))
     
-    # Find which is the insertion or deletion
-    # Are there multiple insertions and deletions
+    # Find which elements of the cigar string are insertion or deletion
+    # Are there multiple insertions and deletions?
     indelIndex <- which((grepl("I|D", splitCigar))) 
     
     # Create a new indel read to edit
     newIndelRead <- indelRead
-    
+
+    # Iterate through in case there are multiple deletions and insertions
     for (i in 1:length(indelIndex)) {
-      
+
       # Find the number of base pairs that are soft clips
-      # Only want to look at the information before the insertion
-      softPos <- which(grepl("S", splitCigar[1:indelIndex]))
+      # Only want to look at the information before the currently considered indel
+      softPos <- grep("S", splitCigar[1:indelIndex[i]])
       softPos <- sum(as.numeric(gsub("\\D", "", splitCigar[softPos])))
       if (length(softPos) == 0) softPos <- 0
       
       # Find the number of base pairs that are matches
-      # Only want to look at the information before the insertion
-      addPos <- which(grepl("M", splitCigar[1:indelIndex]))
+      # Only want to look at the information before the currently considered indel
+      addPos <- grep("M", splitCigar[1:indelIndex[i]])
       addPos <- sum(as.numeric(gsub("\\D", "", splitCigar[addPos])))
       if (length(addPos) == 0) addPos <- 0
       
-      # If there are multiple indels
-      # Need to also add in the indices from the start where they appear
-      prevIndel <- which(grepl("I|D", splitCigar[1:indelIndex - 1]))
-      prevIndel <- sum(as.numeric(gsub("\\D", "", splitCigar[prevIndel])))
-      if (length(prevIndel) == 0) prevIndel <- 0
+      # If there is a previous indel in the same read
+      # Need to consider how the start position will change on the reference
+      # If there was an insertion beforehand, be careful when calculation startPos
+      # Because those bp are adding length that does not exist into the ref seq
       
+      # Add when there is a deletion
+      # Subtract when there is an insertion
+      if (i != 1) {
+        #browser()
+        # Indices or previous insertions or deletions in the same read
+        prevIns <- which(grepl("I", splitCigar[1: (indelIndex[i] - 1) ]))
+        prevDel <- which(grepl("D", splitCigar[1: (indelIndex[i] - 1) ]))
+        
+        # Sums of how many bp are deleted or inserted
+        prevInsSum <- sum(as.numeric(gsub("\\D", "", splitCigar[prevIns])))
+        prevDelSum <- sum(as.numeric(gsub("\\D", "", splitCigar[prevDel]))) 
+        
+      } 
+
       ## Now do the actual insertions or deletions
-      
+
       # Insertions
       if (grepl("I", splitCigar[indelIndex[i]])) {
         
-        ## This is where the actual insertion stuff occurs
-        # Create range for the deletion
-        startPos <- start(indelRead) + addPos + prevIndel
+        # Start of range for the reference
+        # Always off by one 
+        startPos <- start(indelRead) + addPos - 1
         
-        # Deal with the off by one error for the start of the range
-        if (softPos == 0) {  
-          startPos <- startPos - 1
+        # Get the start index for insertion for the raw read
+        altIndexStart <- addPos + softPos 
+        
+        # Multiple indels
+        # Must take into consideration how that will effect the start positions
+        # Add to the reference with previous deletion (insertions do not exist in the reference)
+        # Add to the alternate with previous insertion (deletions do not add length to the alternate)
+        if (i != 1) {
+          #browser()
+          startPos <- startPos + prevDelSum
+          altIndexStart <- altIndexStart + prevInsSum
         }
         
-        # According to VRanges documentation, insertions have width=1 soooo
+        # According to VRanges documentation, insertions have width=1
+        # So start and end are the same for the reference
         endPos <- startPos
-        
-        # Length of insertion
-        insLength <- as.numeric(gsub("\\D", "", splitCigar[indelIndex[i]]))
         
         # Get the reference
         refs <- extractAt(reference, IRanges(startPos, endPos))
         refs <- unname(as.character(unlist(refs)))
         
+        # Length of insertion
+        insLength <- as.numeric(gsub("\\D", "", splitCigar[indelIndex[i]]))
+        
         # Get the alt sequence from the raw read
         altSeq <- as.character(mcols(indelRead)$seq)
         altSplit <- unlist(strsplit(altSeq, split=""))
+        altIndex <- seq(altIndexStart, altIndexStart + insLength, 1)
+        altInd <- altSplit[altIndex]
+        alt <- paste(altInd, collapse="")
         
-        altIndex <- seq(addPos, addPos + insLength, 1)
-        alt <- altSplit[altIndex]
-        alt <- paste(alt, collapse="")
+        # A simple test to make sure insertion was done correctly
+        if (altInd[1] != refs && length(indelIndex) == 1) {
+          message("Incorrect indel for insertion from indel read: ", index)
+          comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
+        }
         
-        ################################
-        # SANITY CHECKS
-        
-        #testRef <- extractAt(reference, IRanges(startPos, startPos))
-        #testRef <- as.character(unlist(testRef))
-        
-        # Get the corresponding ref sequence
-        #refRange <- IRanges(start(indelRead) - softPos, end(indelRead))
-        #refSeq <- as.character(unlist(extractAt(reference, refRange)))
-        
-        # Compare the two strings
-        # Tried doing this using positions based upon cigar string but sometimes got off by one errors
-        #comp <- pairwiseAlignment(refSeq, altSeq)
-        #show(comp)
-        
-        # Make the ref and alt sequences into vectors of characters to look at each character individually
-        #refSplit <- unlist(strsplit(as.character(pattern(comp)), split=""))
-        
-        ###################################
-        
+        # Sanity check!
+        #comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
+
       } # I
       
       # Deletions
       else if (grepl("D", splitCigar[indelIndex[i]])) {
 
-        ## This is where the actual deletion takes place
         # Create range for the deletion
-        startPos <- start(indelRead) + addPos + prevIndel
+        # This must be zero indexed or something, because it is always off by one
+        startPos <- start(indelRead) + addPos - 1
         
-        # These appear to cause one off errors for the start of the range
-        testRef <- extractAt(reference, IRanges(startPos, startPos))
-        testRef <- as.character(unlist(testRef))
-        if (testRef == "N" || softPos == 0) {  ## THROW OUT ALL Ns and if deletion is length 1 #rCRS:m.3107del
-          startPos <- startPos - 1
+        # Get the index for where the deletion takes place
+        altIndexStart <- addPos + softPos 
+        
+        # Multiple indels
+        # Must take into consideration how the start and end values will change
+        if (i != 1) {
+          #browser()
+          startPos <- startPos + prevDelSum
+          altIndexStart <- altIndexStart + prevInsSum
         }
         
-        endPos <- startPos + as.numeric(gsub("\\D", "", splitCigar[indelIndex[i]]))
+        # Length of deletion and end position
+        delLength <- as.numeric(gsub("\\D", "", splitCigar[indelIndex[i]]))
+        endPos <- startPos + delLength
         
         # Get the reference
         refs <- extractAt(reference, IRanges(startPos, endPos))
         refs <- unname(as.character(unlist(refs)))
+        refSplit <- unlist(strsplit(refs, split=""))
         
-        # Do the deletion
-        # Since we are subtracting 1, we are deleting all of the sequences that come after the start
-        # So we just want to keep the first sequence
-        alt <- extractAt(reference, IRanges(startPos, startPos))
-        alt <- unname(unstrsplit(CharacterList(alt)))
+        # Get the alt sequence from the raw read
+        altSeq <- as.character(mcols(indelRead)$seq)
+        altSplit <- unlist(strsplit(altSeq, split=""))
+        alt <- altSplit[altIndexStart]
+
+        # A simple check to ensure the deletion is supposedly happening correctly
+        if ( (alt != refSplit[1]) && length(indelIndex) == 1) {
+          message("Incorrect deletion for indel read, ", index)
+          comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
+        }
         
-        ##########################################
-        # Just a manual check for my own sanity to make sure that this works
-        
-        # Get the alt sequence 
-        #altSeq <- as.character(mcols(indelRead)$seq)
-        
-        # Get the corresponding ref sequence
-        #refRange <- IRanges(start(indelRead) - softPos, end(indelRead))
-        #refSeq <- as.character(unlist(extractAt(reference, refRange)))
-        
-        # Compare the two strings
-        # Tried doing this using positions based upon cigar string but sometimes got off by one errors
-        #comp <- pairwiseAlignment(refSeq, altSeq)
-        
-        #altSplit <- unlist(strsplit(altSeq, split=""))
-        #refSplit <- unlist(strsplit(refSeq, split=""))
-        
-        #show(comp)
-        #show(refs)
-        #show(alt)
-        ############################################
-        
+        # Sanity check!
+        #comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
       } # D
       
       # Store the information
@@ -490,7 +473,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         mcols(appendIndelRead)$alt <- alt
         mcols(appendIndelRead)$ref <- refs
         
-        newIndelRead <- append(newIndelRead, newIndelRead)
+        newIndelRead <- append(newIndelRead, appendIndelRead)
       }
       
     } # For
@@ -584,4 +567,28 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   
 }
 
+# helper fn
+# Usually commented out unless you run into an error
+# A sanity check to compare the raw read against the reference
+# Prints other information like start position, cigar string, and the calculated alt and ref
+.sanCheck <- function(reference, startPos, indelRead, softPos, refs, alt, splitCigar) {
 
+  altSeq <- as.character(mcols(indelRead)$seq)
+  
+  # Get the corresponding ref sequence
+  start <- start(indelRead) - softPos
+  if (start < 0) start <- 1
+  refRange <- IRanges(start, end(indelRead))
+  refSeq <- as.character(unlist(extractAt(reference, refRange)))
+  
+  # Compare the two strings
+  # Tried doing this using positions based upon cigar string but sometimes got off by one errors
+  comp <- pairwiseAlignment(refSeq, altSeq)
+  show(comp)
+  show(splitCigar)
+  print(paste("ref: ", refs))
+  print(paste("alt: ", alt))
+  print(paste("start: ", as.character(startPos)))
+
+  return(comp)
+}
