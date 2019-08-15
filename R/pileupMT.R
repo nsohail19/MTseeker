@@ -67,7 +67,8 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
       
       ### THIS WILL BREKAK IF YOU FEED IT EMPTY MVRANGES
       ### FIX LATER
-      sampNames <- unlist(lapply(mvrl, function(x) unique(as.character(sampleNames(x)))))
+      sampNames <- lapply(bam, function(x) base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(x))))
+      #sampNames <- unlist(lapply(mvrl, function(x) unique(as.character(sampleNames(x)))))
       names(mvrl) <- sampNames
       
       return(mvrl)
@@ -75,10 +76,10 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     
     else {
       mvrl <- MVRangesList(lapply(bam, pileupMT, ref=ref, sbp=sbp))
-      
+      sampNames <- lapply(bam, function(x) base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(x))))
       ### THIS WILL BREKAK IF YOU FEED IT EMPTY MVRANGES
       ### FIX LATER
-      sampNames <- unlist(lapply(mvrl, function(x) unique(as.character(sampleNames(x)))))
+      #sampNames <- unlist(lapply(mvrl, function(x) unique(as.character(sampleNames(x)))))
       names(mvrl) <- sampNames
       
       return(mvrl)
@@ -220,11 +221,12 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     
     names(mvr) <- MTHGVS(mvr)
   }
-  
+
   # There are no indels and no SNPs
   # Create an empty MVRanges
   if (nrow(pu) == 0 && nrow(indels) == 0) {
     mvr <- MVRanges(GRanges(c(seqnames=NULL,ranges=NULL,strand=NULL)), coverage = covg)
+    return(mvr)
   }
   
   # If there are no SNPs but there are indels
@@ -241,7 +243,6 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   }
 
   metadata(mvr)$coverageRle <- coverage(mvr)
-  sampleNames(mvr) <- base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(bam)))
   return(mvr)
 }
 
