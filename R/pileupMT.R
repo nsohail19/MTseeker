@@ -427,7 +427,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         delLength <- as.numeric(gsub("\\D", "", splitCigar[indelIndex[i]]))
         
         # In rCRS, there is an N located at bp 3107
-        if (ref = "rCRS" && startPos == 3107 && delLength == 1) {
+        if (ref =- "rCRS" && startPos == 3107 && delLength == 1) {
           startPos <- startPos - 1
         }
         
