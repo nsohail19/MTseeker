@@ -419,13 +419,18 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         # Multiple indels
         # Must take into consideration how the start and end values will change
         if (i != 1) {
-          # 
           startPos <- startPos + prevDelSum
           altIndexStart <- altIndexStart + prevInsSum
         }
         
         # Length of deletion and end position
         delLength <- as.numeric(gsub("\\D", "", splitCigar[indelIndex[i]]))
+        
+        # In rCRS, there is an N located at bp 3107
+        if (ref = "rCRS" && startPos == 3107 && delLength == 1) {
+          startPos <- startPos - 1
+        }
+        
         endPos <- startPos + delLength
         
         # Get the reference
