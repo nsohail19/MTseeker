@@ -323,7 +323,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
     # Iterate through in case there are multiple deletions and insertions
     for (i in 1:length(indelIndex)) {
-
+      browser()
       # Find the number of base pairs that are soft clips
       # Only want to look at the information before the currently considered indel
       softPos <- grep("S", splitCigar[1:indelIndex[i]])
@@ -372,7 +372,6 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         # Add to the reference with previous deletion (insertions do not exist in the reference)
         # Add to the alternate with previous insertion (deletions do not add length to the alternate)
         if (i != 1) {
-          # 
           startPos <- startPos + prevDelSum
           altIndexStart <- altIndexStart + prevInsSum
         }
@@ -395,14 +394,24 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         altInd <- altSplit[altIndex]
         alt <- paste(altInd, collapse="")
         
+        # Raw read has an "N" where the insertion occurs
+        # Toss it out
+        if (grepl("N", alt)) {
+          altInd <- ""
+          alt <- ""
+          refs <- ""
+          startPos <- NA_integer_
+          endPos <- NA_integer_
+        }
+        
         # A simple test to make sure insertion was done correctly
         if (altInd[1] != refs && length(indelIndex) == 1) {
-          warning(paste("Incorrect indel for insertion from indel read: ", as.character(index)))
+          message(paste("Incorrect insertion for indel read, ", as.character(index), "for ", sampleNames(indelRead)))
           comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
         }
         
         # Sanity check!
-        #comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
+        comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
 
       } # I
       
@@ -444,9 +453,18 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         altSplit <- unlist(strsplit(altSeq, split=""))
         alt <- altSplit[altIndexStart]
 
+        # If the raw read has an "N" where the deletion occurs
+        # Toss it out
+        if (grepl("N", alt)) {
+          alt <- ""
+          refs <- ""
+          startPos <- NA_integer_
+          endPos <- NA_integer_
+        }
+        
         # A simple check to ensure the deletion is supposedly happening correctly
         if ( (alt != refSplit[1]) && length(indelIndex) == 1) {
-          warning(paste("Incorrect deletion for indel read, ", as.character(index)))
+          message(paste("Incorrect deletion for indel read, ", as.character(index), "for ", sampleNames(indelRead)))
           comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
         }
         
@@ -479,6 +497,11 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     } # For
     
   } # Else 
+  browser()
+  # Get rid of any indel reads which contained bad information
+  # They should have NA for their start position
+  keep <- which(!is.na(mcols(newIndelRead)$indelStart))
+  newIndelRead <- newIndelRead[keep]
   
   return(newIndelRead)
 }
