@@ -397,7 +397,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         
         # A simple test to make sure insertion was done correctly
         if (altInd[1] != refs && length(indelIndex) == 1) {
-          message("Incorrect indel for insertion from indel read: ", index)
+          warning(paste("Incorrect indel for insertion from indel read: ", as.character(index)))
           comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
         }
         
@@ -446,7 +446,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
         # A simple check to ensure the deletion is supposedly happening correctly
         if ( (alt != refSplit[1]) && length(indelIndex) == 1) {
-          message("Incorrect deletion for indel read, ", index)
+          warning(paste("Incorrect deletion for indel read, ", as.character(index)))
           comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
         }
         
