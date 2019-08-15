@@ -138,6 +138,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
     # This is to help with debugging
     mcols(indelReads)$bam <- sampNames
+    mcols(indelReads)$potentialHaplo <- FALSE
     
     message("Tallying indels for: ", sampNames)
 
@@ -219,6 +220,15 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     metadata(mvr)$pup <- pup
     mvr$bam <- basename(bam)
     genome(mvr) <- ref
+    
+    # Determine if these are potentially a part of haplogroup regions
+    data(haplomask_whitelist)
+    mvr$potentialHaplo <- FALSE
+    #haploSnps <- subsetByOverlaps(ranges(haplomask_whitelist[[1]]), IRanges(startPos, endPos))
+    for (i in 1:nrow(pu)) {
+      haploSnps <- subsetByOverlaps(ranges(haplomask_whitelist[[1]]), IRanges(pu[i,]$pos, pu[i,]$pos))
+      if (length(haploSnps) > 0) mvr[i]$potentialHaplo <- TRUE
+    }
     
     names(mvr) <- MTHGVS(mvr)
   }
@@ -331,6 +341,8 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     # Iterate through in case there are multiple deletions and insertions
     for (i in 1:length(indelIndex)) {
 
+      potentialHaplo <- FALSE
+      
       # Find the number of base pairs that are soft clips
       # Only want to look at the information before the currently considered indel
       softPos <- grep("S", splitCigar[1:indelIndex[i]])
@@ -357,7 +369,6 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
       # Add when there is a deletion
       # Subtract when there is an insertion
       if (i != 1) {
-        # 
         # Indices or previous insertions or deletions in the same read
         prevIns <- which(grepl("I", splitCigar[1: (indelIndex[i] - 1) ]))
         prevDel <- which(grepl("D", splitCigar[1: (indelIndex[i] - 1) ]))
@@ -407,6 +418,14 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         altInd <- altSplit[altIndex]
         alt <- paste(altInd, collapse="")
         
+        # If the first element of cigar string is to do the insertion
+        # We have no way of knowning the element before the insertion
+        # So we have to use the reference
+        if (indelIndex[i] == 1) {
+          alt <- paste0(refs, alt, collapse="")
+          altInd <- c(refs, altInd)
+        }
+        
         # Raw read has an "N" where the insertion occurs
         # Toss it out
         if (grepl("N", alt)) {
@@ -418,9 +437,25 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         }
         
         # A simple test to make sure insertion was done correctly
-        if (altInd[1] != refs && length(indelIndex) == 1) {
-          message(paste("Incorrect insertion for indel read index:", as.character(index), "for", as.character(mcols(indelRead)$bam)))
-          comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
+        # That became less simple
+        if (altInd[1] != refs) {
+          
+          # If the variants falls within a haplogroup region
+          # Just leave it be
+          data(haplomask_whitelist)
+          #haploSnps <- subsetByOverlaps(ranges(haplomask_whitelist[[1]]), IRanges(startPos, endPos))
+          #haploDels <- subsetByOverlaps(ranges(haplomask_whitelist[[2]]), IRanges(startPos, endPos))
+          haploIns <- subsetByOverlaps(ranges(haplomask_whitelist[[3]]), IRanges(startPos, endPos))
+          
+          if (length(haploIns) > 0) {
+            message(paste("Potential haplogroup insertion variant at position:", as.character(startPos), "for sample:", as.character(mcols(indelRead)$bam)))
+            potentialHaplo <- TRUE
+          }
+          
+          else {
+            message(paste("Incorrect insertion for indel read index:", as.character(index), "for", as.character(mcols(indelRead)$bam)))
+            comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
+          }
         }
         
         # Sanity check!
@@ -466,6 +501,13 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         altSplit <- unlist(strsplit(altSeq, split=""))
         alt <- altSplit[altIndexStart]
 
+        # If the first element of cigar string is to do the deletion
+        # We have no way of knowning the element before the deletion
+        # So we have to use the reference
+        if (indelIndex[i] == 1) {
+          alt <- refSplit[1]
+        }
+        
         # If the raw read has an "N" where the deletion occurs
         # Toss it out
         if (grepl("N", alt)) {
@@ -476,9 +518,24 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         }
         
         # A simple check to ensure the deletion is supposedly happening correctly
-        if ( (alt != refSplit[1]) && length(indelIndex) == 1) {
-          message(paste("Incorrect deletion for indel read index:", as.character(index), "for", as.character(mcols(indelRead)$bam)))
-          comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
+        # That became less simple
+        if ( alt != refSplit[1] ) {
+
+          # Keeps track if the variant falls in a common haplogroup region (ancestral variation)
+          data(haplomask_whitelist)
+          #haploSnps <- subsetByOverlaps(ranges(haplomask_whitelist[[1]]), IRanges(startPos, endPos))
+          haploDels <- subsetByOverlaps(ranges(haplomask_whitelist[[2]]), IRanges(startPos, endPos))
+          #haploIns <- subsetByOverlaps(ranges(haplomask_whitelist[[3]]), IRanges(startPos, endPos))
+          
+          if (length(haploDels) > 0) {
+            message(paste("Potential haplogroup deletion variant at position:", as.character(startPos), "for sample:",as.character(mcols(indelRead)$bam)))
+            potentialHaplo <- TRUE
+          }
+          
+          else {
+            message(paste("Incorrect insertion for indel read index:", as.character(index), "for", as.character(mcols(indelRead)$bam)))
+            comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
+          }
         }
         
         # Sanity check!
@@ -492,6 +549,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         mcols(newIndelRead)$indelEnd <- endPos
         mcols(newIndelRead)$alt <- alt
         mcols(newIndelRead)$ref <- refs
+        mcols(newIndelRead)$potentialHaplo <- potentialHaplo
       }
       
       # Append another indel to the first one
@@ -503,6 +561,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         mcols(appendIndelRead)$indelEnd <- endPos
         mcols(appendIndelRead)$alt <- alt
         mcols(appendIndelRead)$ref <- refs
+        mcols(appendIndelRead)$potentialHaplo <- potentialHaplo
         
         newIndelRead <- append(newIndelRead, appendIndelRead)
       }
@@ -538,7 +597,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   #pu$alleles <- .byPos(pu, "isAlt") + 1 
 
   # Turn into GRanges
-  columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth")
+  columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth", "potentialHaplo")
   grIndel <- keepSeqlevels(.puToGR(indelSupport[,columns]), unique(indelSupport$seqnames))
   seqinfo(grIndel) <- Seqinfo(levels(seqnames(grIndel)), width(.getRefSeq(ref)), isCircular=TRUE, genome=ref)
   
@@ -574,6 +633,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   totalDepth(mvrIndelunique) <- refDepth(mvrIndelunique) + altDepth(mvrIndelunique)
   
   mvr <- MVRanges(mvrIndelunique, coverage = covg)
+  
   return(mvr)
   
 }
