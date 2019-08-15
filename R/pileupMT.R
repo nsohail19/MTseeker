@@ -65,10 +65,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     if(parallel) {
       mvrl <- MVRangesList(mclapply(bam, pileupMT, sbp=sbp, ref=ref, parallel=parallel, cores=cores))
       
-      ### THIS WILL BREKAK IF YOU FEED IT EMPTY MVRANGES
-      ### FIX LATER
       sampNames <- lapply(bam, function(x) base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(x))))
-      #sampNames <- unlist(lapply(mvrl, function(x) unique(as.character(sampleNames(x)))))
       names(mvrl) <- sampNames
       
       return(mvrl)
@@ -76,10 +73,8 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     
     else {
       mvrl <- MVRangesList(lapply(bam, pileupMT, ref=ref, sbp=sbp))
+      
       sampNames <- lapply(bam, function(x) base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(x))))
-      ### THIS WILL BREKAK IF YOU FEED IT EMPTY MVRANGES
-      ### FIX LATER
-      #sampNames <- unlist(lapply(mvrl, function(x) unique(as.character(sampleNames(x)))))
       names(mvrl) <- sampNames
       
       return(mvrl)
