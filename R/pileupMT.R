@@ -99,6 +99,9 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   numReads <- length(reads)
   readsWidth <- median(qwidth(reads)) - 1
   
+  # Name of the bam/sample
+  sampNames <- base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(bam)))
+  
   # number of reads * length of reads / length of ref sequence
   covg <- round(numReads * readsWidth / width(refSeqDNA))
   if (is.na(covg)) covg <- 0
@@ -132,11 +135,14 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     
     mcols(indelReads)$ref <- NA_character_
     mcols(indelReads)$alt <- NA_character_
+
+    # This is to help with debugging
+    mcols(indelReads)$bam <- sampNames
     
-    message("Tallying indels for: ", bam)
+    message("Tallying indels for: ", sampNames)
 
     if (length(indelIndex) > 500) {
-      message("This may take a while, determining ", length(indelIndex), " reads for indels from ", bam)
+      message("This may take a while, determining ", length(indelIndex), " reads for indels from ", sampNames)
     }
     
     # Empty GAlignment that will have new indels appended to it
@@ -164,7 +170,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   }
   # data(fpFilter_Triska, package="MTseeker") # for when they are... 
   
-  message("Tallying SNPs for: ", bam)
+  message("Tallying SNPs for: ", sampNames)
 
   # this may belong in a separate helper function...
   pu <- subset(pu, nucleotide %in% c('A','C','G','T'))
@@ -310,6 +316,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     # Keep track of how many base pairs are being added in the cigar string
     addPos <- 0 # Matches (M in cigar strings)
     softPos <- 0 # Soft clips (S in cigar strings)
+    splicePos <- 0 # Spliced zones (N in cigar strings)
     
     splitCigar <- gsub("([[:digit:]]+[[:alpha:]])", "\\1 ", cigar(indelRead))
     splitCigar <- unlist(strsplit(splitCigar, " "))
@@ -323,7 +330,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
     # Iterate through in case there are multiple deletions and insertions
     for (i in 1:length(indelIndex)) {
-      browser()
+
       # Find the number of base pairs that are soft clips
       # Only want to look at the information before the currently considered indel
       softPos <- grep("S", splitCigar[1:indelIndex[i]])
@@ -335,6 +342,12 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
       addPos <- grep("M", splitCigar[1:indelIndex[i]])
       addPos <- sum(as.numeric(gsub("\\D", "", splitCigar[addPos])))
       if (length(addPos) == 0) addPos <- 0
+      
+      # There can be spliced reads 
+      # Only have to add this onto the reference sequence
+      splicePos <- grep("N", splitCigar[1:indelIndex[i]])
+      splicePos <- sum(as.numeric(gsub("\\D", "", splitCigar[splicePos])))
+      if (length(splicePos) == 0) splicePos <- 0
       
       # If there is a previous indel in the same read
       # Need to consider how the start position will change on the reference
@@ -362,7 +375,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         
         # Start of range for the reference
         # Always off by one 
-        startPos <- start(indelRead) + addPos - 1
+        startPos <- start(indelRead) + addPos - 1 + splicePos
         
         # Get the start index for insertion for the raw read
         altIndexStart <- addPos + softPos 
@@ -406,12 +419,12 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         
         # A simple test to make sure insertion was done correctly
         if (altInd[1] != refs && length(indelIndex) == 1) {
-          message(paste("Incorrect insertion for indel read, ", as.character(index), "for ", sampleNames(indelRead)))
+          message(paste("Incorrect insertion for indel read index:", as.character(index), "for", as.character(mcols(indelRead)$bam)))
           comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
         }
         
         # Sanity check!
-        comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
+        #comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
 
       } # I
       
@@ -420,7 +433,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
         # Create range for the deletion
         # This must be zero indexed or something, because it is always off by one
-        startPos <- start(indelRead) + addPos - 1
+        startPos <- start(indelRead) + addPos - 1 + splicePos
         
         # Get the index for where the deletion takes place
         altIndexStart <- addPos + softPos 
@@ -464,7 +477,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         
         # A simple check to ensure the deletion is supposedly happening correctly
         if ( (alt != refSplit[1]) && length(indelIndex) == 1) {
-          message(paste("Incorrect deletion for indel read, ", as.character(index), "for ", sampleNames(indelRead)))
+          message(paste("Incorrect deletion for indel read index:", as.character(index), "for", as.character(mcols(indelRead)$bam)))
           comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
         }
         
@@ -497,7 +510,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     } # For
     
   } # Else 
-  browser()
+
   # Get rid of any indel reads which contained bad information
   # They should have NA for their start position
   keep <- which(!is.na(mcols(newIndelRead)$indelStart))
