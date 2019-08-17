@@ -21,8 +21,8 @@
 #' injectMTVariants(RO_2)
 #'
 #' @export
-injectMTVariants <- function(mvr, gr=NULL, aa=TRUE, canon=.99, refX=1, altX=1) {
-  
+injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
+
   # rCRS only, for the time being 
   stopifnot(unique(genome(mvr)) == "rCRS")
   
@@ -30,9 +30,16 @@ injectMTVariants <- function(mvr, gr=NULL, aa=TRUE, canon=.99, refX=1, altX=1) {
   if (is.null(gr)) gr <- genes(mvr)
   stopifnot(unique(genome(gr)) == "rCRS")
   
-  # subset the variants to those that overlap the target GRanges and are canon
-  mvr <- subset(locateVariants(subsetByOverlaps(mvr, gr, type="within")),
-                VAF >= canon & refDepth < refX & altDepth > altX )
+  # Assuming you have filtered by now
+  #mvr <- newFilterMT(mvr, minTotalDepth=refX+altX, minAltDepth=altX)
+  
+  # No mvr given
+  if (!length(mvr)) return(mvr[0])
+
+  submvr <- locateMTvariants(subsetByOverlaps(mvr, gr, type="within"))
+
+  # If submvr is empty
+  if (!length(submvr)) return(mvr[0])
   
   # mitochondrial genomic sequence
   # FIXME: may not want to do this
@@ -43,178 +50,149 @@ injectMTVariants <- function(mvr, gr=NULL, aa=TRUE, canon=.99, refX=1, altX=1) {
   names(altSeq) <- names(rCRSeq)
   gr$varDNA <- getSeq(altSeq, gr)
   
-  if (aa) {
-    
-    # use MT_CODE to translate results
-    MT_CODE <- getGeneticCode("SGC1")
-    gr$refSeq <- getSeq(rCRSeq, gr)
-    gr$varSeq <- gr$refSeq 
-    gr$refAA <- suppressWarnings(translate(gr$refSeq, MT_CODE))
-    gr$varAA <- gr$refAA
-    gr$consequences <- NA_character_
-    
-    # this is a bit tricky 
-    for (g in names(gr)) {
-      
-      submvr <- subsetByOverlaps(mvr, gr[g])
-      
-      if (length(submvr)) {
-        
-        ### FIX: Not sure what the actual codon end should be for the second gene
-        ### FIX: For now this only handles deletions
-        
-        # Check to see if the variant is in an overlapping gene
-        # Assumes the entire second gene will not be deleted
-        if (!is.na(submvr$overlapGene)) {
-          
-          # Workaround 
-          # Not fixed for insertions
-          if (grepl("ins", names(submvr))) {
-            
-            orig <- extractAt(gr[g]$refAA, IRanges(submvr$startCodon,submvr$startCodon))
-            altd <- extractAt(gr[g]$varAA, IRanges(submvr$startCodon,submvr$startCodon))
-            gr[g]$consequences <- "overlap"
-            warning("Overlapping genes with insertion in: ", print(names(submvr)))
-            next
-          }
-          
-          # Names of overlapping gene
-          affectedGenes <- unlist(strsplit(mcols(submvr)$overlapGene, split=","))
-          
-          # For the first gene
-          if (g == affectedGenes[1]) {
+  # use MT_CODE to translate results
+  MT_CODE <- getGeneticCode("SGC1")
+  gr$refSeq <- getSeq(rCRSeq, gr)
+  gr$varSeq <- gr$refSeq 
+  gr$refAA <- suppressWarnings(translate(gr$refSeq, MT_CODE))
+  gr$varAA <- gr$refAA
+  gr$consequences <- NA_character_
+  gr$typeMut <- NA_character_
+  gr$overlapGene <- NA_character_
+  
+  
+  # Determine the type of mutation
+  submvr$typeMut <- NA_character_
+  
+  # Iterate through all of the affected genes
+  for (i in 1:length(submvr)) {
 
-            # If the variant is located within the range of start and end of the gene
-            # then it can continue as normal
-            if ( (start(submvr) >= start(gr[g])) && (end(submvr) <= end(gr[g])) ) {
-              # This is fine
-            }
-            
-            # If the variant starts in one gene, but then goes into the next
-            # then artificially makes a new ending for the variant within the first gene
-            if (end(submvr) > end(gr[g])) {
-              
-              # Create an artifical end for the variant
-              submvr$localEnd <- width(gr[g])
-              submvr$endCodon <- width(gr[g]$refAA)
-              
-            }
-          } # 1st gene
-          
-          # For the second gene
-          # In this next iteration, all information about the variant is reset
-          if (g == affectedGenes[2]) {
-            
-            # If the deletion is completely encompassed within this second gene
-            if ( (start(submvr) >= start(gr[g])) && (end(submvr) <= end(gr[g])) ) {
-              
-              # Have to change the start and end locations to reflect local values
-              submvr$localStart <- start(submvr) - start(gr[g])
-              submvr$localEnd <- submvr$localStart + (width(submvr) - 1)
-              
-            }
-            
-            # If part of the deletion takes place in the first gene
-            # then continues the deletion in the beginning of this second gene
-            # Must alter the sequence that is replaced
-            if (start(submvr) < start(gr[g])) {
-              
-              oldWidth <- width(submvr)
-              submvr$localStart <- 1
-              submvr$localEnd <- submvr$localStart + (oldWidth - 1) 
-              
-            }
-            
-            # Need to figure out the startCodon and endCodon
-            # For now, if the sequence is evenly divided into 3
-            # assume the first bp of the gene is the start bp
-            if ( (width(gr[g]$refSeq) %% 3 == 0) && (width(gr[g]$refSeq) / 3 == width(gr[g]$refAA)) ){
-              
-              submvr$startCodon <- floor(submvr$localStart / 3)
-              submvr$endCodon <- ceiling(submvr$localEnd / 3)
-            }
-            
-            else {
-              message("Need new method to determine start and end codons")
-              warning("Setting codons potentially incorrectly for ", names(submvr))
-              submvr$startCodon <- floor(submvr$localStart / 3)
-              submvr$endCodon <- ceiling(submvr$localEnd / 3)
-            }
-            
-            
-          } # 2nd gene
-          
-        } # !overlappingGene
-      }
-      
-      #related to the off by 1 error below
-      #this should catch indels in codon 1
-      if (length(submvr)) {
-        if (submvr$localStart == 0 & submvr$localEnd > 0) {
-          submvr$localStart <- 1
-          submvr$localEnd <- submvr$localEnd + 1
-        }
-        if (submvr$localStart == 0 & submvr$localEnd == 0) {
-          submvr$localStart <- 1
-          submvr$localEnd <- 1
-        }
-      }
-      subir <- IRanges(submvr$localStart, submvr$localEnd)
-      gr[g]$varSeq <- replaceAt(gr[g]$refSeq, subir, alt(submvr))
-      gr[g]$varAA <- suppressWarnings(translate(gr[g]$varSeq, MT_CODE))
-      # FIXME: probably different in terms of end codon from orig (esp for AAfs)
-      #bizarre checks for if a bp change occurs in the first codon at bp 1
-      #this actually looks like an off by 1 error when the 1st codon is impacted
-      if (length(submvr)) {
-        if (submvr$startCodon == 0) {
-          submvr$startCodon <- 1
-        }
-      }
-      if (length(submvr)) {
-        if (submvr$endCodon == 0) {
-          submvr$endCodon <- 1
-        }
-      }
-      
-      # AA sequence from the reference
-      orig <- extractAt(gr[g]$refAA, IRanges(submvr$startCodon,submvr$endCodon))
-      
-      # If there is a deletion at the end of a gene
-      # Must go here otherwise the endCodon value changes and you get the incorrect reference AA
-      if (length(submvr)) {
-        if (submvr$endCodon > width(gr[g]$varAA)) {
-          
-          submvr$endCodon <- width(gr[g]$varAA)
-        }
-      }
-      
-      altd <- extractAt(gr[g]$varAA, IRanges(submvr$startCodon,submvr$endCodon))
-      gr[g]$consequences <- .flattenConsequences(orig, altd, submvr$startCodon)
-      
-    } 
+    # Name of gene 
+    g <- submvr[i]$gene
     
-    # for later
-    if (FALSE) {
-      alignments <- pairwiseAlignment(gr$refAA, gr$varAA,
-                                      substitutionMatrix = "BLOSUM50",
-                                      gapOpening = 0, gapExtension = 8)
+    # Range for the variant
+    subir <- IRanges(submvr[i]$localStart, submvr[i]$localEnd)
+    refSeq <- as.character(unlist(unname(extractAt(gr[g]$refSeq, subir))))
+    if (refSeq != ref(submvr[i])) {
+      if (g == "MT-ND6" && genome(submvr) == "rCRS") {
+        message("It is difficult to pinpoint MT-ND6 variants start locations, skipping . . .")
+        next
+      }
+      else message("Injecting variant incorrectly")
+    }
+                        
+    # Replace the part of the reference sequences with the variants
+    # Then translates the variant sequences to get the amino acid sequence
+    gr[g]$varSeq <- replaceAt(gr[g]$refSeq, subir, alt(submvr[i]))
+    gr[g]$varAA <- suppressWarnings(translate(gr[g]$varSeq, MT_CODE))
+    
+    # AA sequence from the reference at the variant site
+    orig <- extractAt(gr[g]$refAA, IRanges(submvr[i]$startCodon, submvr[i]$endCodon))
+    
+    # If there is a deletion at the end of a gene
+    # Must go here otherwise the endCodon value changes and you get the incorrect reference AA
+    if (submvr[i]$endCodon > width(gr[g]$varAA)) {
+      submvr[i]$endCodon <- width(gr[g]$varAA)
     }
     
+    # Get the alternate AA sequences at the variant site
+    altd <- extractAt(gr[g]$varAA, IRanges(submvr[i]$startCodon, submvr[i]$endCodon))
+    gr[g]$consequences <- .flattenConsequences(orig, altd, submvr[i]$startCodon)
+    
+    # Determine the overaching consequences (type of mutation)
+    # SNP
+    if (grepl(">", names(submvr[i]))) {
+      if (gr[g]$consequences == "") submvr[i]$typeMut <- "synonymous"
+      else if ("*" %in% unlist(altd)) submvr[i]$typeMut <- "nonsense"
+      else submvr[i]$typeMut <- "missense"
+    }
+    
+    #### MAY HAVE TO GET ALTD SEQUENCE BASED UPON INS OR DELETION
+    #### IF THERE IS AN INSERTION, THE START AND END CODONS WILL BE DIFFERENT
+    # Insertions
+    else if (grepl("ins", names(submvr[i]))) {
+      if ( (nchar(alt(submvr[i])) - 1)  %% 3 == 0 ) submvr[i]$typeMut <- "insertion"
+      else submvr[i]$typeMut <- "frameshift"
+    }
+    
+    # Deletions
+    else {
+      if ( (nchar(ref(submvr[i])) - 1) %% 3 == 0) submvr[i]$typeMut <- "deletion"
+          else submvr[i]$typeMut <- "frameshift"
+      
+    }
+    
+    # If there is a frameshift mutation
+    # Return the rest of the AA sequence as the consequence
+    if (submvr[i]$typeMut == "frameshift") {
+      
+      # Want to return the rest of the sequence that has come super wonky
+      orig <- extractAt(gr[g]$refAA, IRanges(submvr[i]$startCodon, width(gr[g]$refAA)))
+      altd <- extractAt(gr[g]$varAA, IRanges(submvr[i]$startCodon, width(gr[g]$varAA)))
+      gr[g]$consequences <- .flattenConsequences(orig, altd, submvr[i]$startCodon)
+    }
+    
+    # Store the information
+    gr[g]$typeMut <- submvr[i]$typeMut
+    if (!is.na(submvr[i]$overlapGene)) gr[g]$overlapGene <- submvr[i]$overlapGene
+    
+    
+    if (refSeq != ref(submvr[i])) .compCheck(gr, g, submvr[i])
+    # San check :)
+    #if (!is.na(submvr[i]$overlapGene)) {
+    #  show(names(submvr[i]))
+    #  show(gr[g]$consequences)
+    #  .compCheck(gr, g, submvr[i])
+    #}
+    
+  } # for
+  
+  # later
+  if (FALSE) {
+    alignments <- pairwiseAlignment(gr$refAA, gr$varAA,
+                                    substitutionMatrix = "BLOSUM50",
+                                    gapOpening = 0, gapExtension = 8)
   }
   
-  # done
-  return(gr)
+  # Only return the genes that are affected by this variant
+  return(gr[submvr$gene])
 }
-
-
 
 # helper function
 .flattenConsequences <- function(orig, altd, startCodons) {
-
+  
   .flat <- function(x) vapply(x[[1]], as.character, "N") 
   .prettify <- function(x) paste0(gsub(" ", "", x), collapse="")
   asdf <- DataFrame(refAA=.flat(orig), pos=startCodons, varAA=.flat(altd))
   csqs <- apply(subset(asdf, asdf$refAA != asdf$varAA), 1, .prettify)
   paste(csqs, collapse=",")
+  
+}
 
+# helper fn
+.compCheck <- function(gr, g, submvr) {
+  
+  print(as.character(names(submvr)))
+  
+  # DNA sequence ranges
+  varRanges <- IRanges(submvr$localStart, width(gr[g]$varSeq))
+  refRanges <- IRanges(submvr$localStart, width(gr[g]$refSeq))
+  
+  varDna <- unlist(unname(extractAt(gr[g]$varSeq, varRanges)))
+  refDna <- unlist(unname(extractAt(gr[g]$refSeq, refRanges)))
+  
+  print("DNA sequences:")
+  comp <- pairwiseAlignment(refDna, varDna)
+  show(comp)
+  
+  # AA sequence ranges
+  varRanges <- IRanges(submvr$startCodon, width(gr[g]$varAA))
+  refRanges <- IRanges(submvr$startCodon, width(gr[g]$refAA))
+  
+  varAA <- unlist(unname(extractAt(gr[g]$varAA, varRanges)))
+  refAA <- unlist(unname(extractAt(gr[g]$refAA, refRanges)))
+  
+  print("AA sequences")
+  comp <- pairwiseAlignment(refAA, varAA)
+  show(comp)
 }

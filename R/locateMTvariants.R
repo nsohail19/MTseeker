@@ -1,3 +1,15 @@
+#' Locates the variant and determines local bounds within gene
+#' Primarily meant to be used within injectMTvarients
+#' 
+#' @param query      A single variant in MVRanges form 
+#'
+#' @return           An MVRanges with start and end codons (overlaps return 2 copies of the variant)
+#'
+#'
+#'
+#'
+
+
 locateMTvariants <- function(query) {
 
   # Checks if the function has been run before
