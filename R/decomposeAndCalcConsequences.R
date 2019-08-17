@@ -43,77 +43,117 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, ..
   if (is(mvr, "MVRangesList") & parallel) {
     mvrl <- MVRangesList(mclapply(mvr, decomposeAndCalcConsequences, ...))
     return(mvrl)
-    }
+  }
+  
   #run serially
   if (is(mvr, "MVRangesList")) {
     mvrl <- MVRangesList(lapply(mvr, decomposeAndCalcConsequences, ...))
     return(mvrl)
     }
 
+  # Save the coverage information for later when we combine mvr and overlapMvr at the end
+  covg <- genomeCoverage(mvr)
+  
   #preprocess the variants
   mvr <- .getCoding(mvr, ...)
-  
+
   if (length(mvr) == 0) {
-    message("No variants overlapping coding space")
+    message("No variants found within the coding region, returning empty MVRanges")
     return(mvr)
   }
   
   #add empty column for consequences
   mcols(mvr)$AAchange <- NA
+  mcols(mvr)$typeMut <- NA
+  
   mcols(mvr)$impacted.gene <- NA
+  mcols(mvr)$overlapGene <- NA
+  
+  # Store overlapping variants here
+  # Even though there will be doubles of variants
+  # I would rather they represent where the variant will occur
+  overlapMvr <- mvr[0]
   
   if (!isDisjoint(mvr)) {
+    
     message("Found non-disjoint ranges in ", sampleNames(mvr)@values)
     message("Processing consequences...")
+    
     if (AAchanges) {
+
       for (r in 1:length(mvr)) {
+
         con <- injectMTVariants(mvr[r], ...)
-        con.sub <- subset(con, mcols(con)$consequences != "")
-        if (length(con.sub)) {
-          if (length(mcols(con.sub)$consequences) > 1) {
-            mcols(mvr)$AAchange[r] <- paste(mcols(con.sub)$consequences, collapse = ",")
-          }
-          if (length(mcols(con.sub)$synonym) > 1) {
-            mcols(mvr)$impacted.gene[r] <- paste(mcols(con.sub)$synonym, collapse = ",")
-          }
-          else {
-            mcols(mvr)$AAchange[r] <- mcols(con.sub)$consequences
-            mcols(mvr)$impacted.gene[r] <- mcols(con.sub)$synonym 
-          }
+        
+        if (length(con) == 2) {
+          
+          newMvr <- mvr[r]
+          
+          mcols(newMvr)$AAchange <- mcols(con)$consequences[2]
+          mcols(newMvr)$typeMut <- mcols(con)$typeMut[2]
+          
+          mcols(newMvr)$impacted.gene <- mcols(con)$synonym[2]
+          mcols(newMvr)$overlapGene <- mcols(con)$overlapGene[2]
+          
+          overlapMvr <- append(overlapMvr, newMvr)
+          
         } else {
-          mcols(mvr)$impacted.gene[r] <- .getGeneImpacted(mvr[r])
-          }
-      }
-    }
-  } else {
-    message("Processing consequences for ", sampleNames(mvr)@values)
-    if (AAchanges) {
-      for (r in 1:length(mvr)) {
-        con <- injectMTVariants(mvr[r], ...)
-        con.sub <- subset(con, mcols(con)$consequences != "")
-        if (length(con.sub)) {
-          if (length(mcols(con.sub)$consequences) > 1) {
-            mcols(mvr)$AAchange[r] <- paste(mcols(con.sub)$consequences, collapse = ",")
-          }
-          if (length(mcols(con.sub)$synonym) > 1) {
-            mcols(mvr)$impacted.gene[r] <- paste(mcols(con.sub)$synonym, collapse = ",")
-          }
-          else {
-            mcols(mvr)$AAchange[r] <- mcols(con.sub)$consequences
-            mcols(mvr)$impacted.gene[r] <- mcols(con.sub)$synonym 
-          }
-        } else {
-          mcols(mvr)$impacted.gene[r] <- .getGeneImpacted(mvr[r])
+          
+          mcols(mvr)$AAchange[r] <- mcols(con)$consequences
+          mcols(mvr)$typeMut[r] <- mcols(con)$typeMut
+          
+          mcols(mvr)$impacted.gene[r] <- mcols(con)$synonym
+          mcols(mvr)$overlapGene[r] <- mcols(con)$overlapGene
+          
         }
       }
-    }
+      
+    } # AAchanges
+    
   }
   
+  else {
+    message("Processing consequences for ", sampleNames(mvr)@values)
+    if (AAchanges) {
+      
+      for (r in 1:length(mvr)) {
+        con <- injectMTVariants(mvr[r], ...)
+        
+        if (length(con) == 2) {
+
+          newMvr <- mvr[r]
+          
+          mcols(newMvr)$AAchange <- mcols(con)$consequences[2]
+          mcols(newMvr)$typeMut <- mcols(con)$typeMut[2]
+          
+          mcols(newMvr)$impacted.gene <- mcols(con)$synonym[2]
+          mcols(newMvr)$overlapGene <- mcols(con)$overlapGene[2]
+          
+          overlapMvr <- append(overlapMvr, newMvr)
+          
+        } else {
+          
+          mcols(mvr)$AAchange[r] <- mcols(con)$consequences
+          mcols(mvr)$typeMut[r] <- mcols(con)$typeMut
+          
+          mcols(mvr)$impacted.gene[r] <- mcols(con)$synonym
+          mcols(mvr)$overlapGene[r] <- mcols(con)$overlapGene
+          
+        }
+      }
+      
+      
+    } ## AAchanges
+  }
+  
+
+  mvr <- sort(MVRanges(c(mvr, overlapMvr), coverage = covg), ignore.strand=T)
   return(mvr)
 }
 
 # helper function to subset ranges to just coding space
 .getCoding <- function(mvr, gr=NULL, canon=.99, refX=1, altX=1) {
+
   # rCRS only, for the time being 
   stopifnot(unique(genome(mvr)) == "rCRS")
   
@@ -121,17 +161,20 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, ..
   if (is.null(gr)) gr <- genes(mvr)
   stopifnot(unique(genome(gr)) == "rCRS")
 
+  mvr <- MVRanges(subsetByOverlaps(mvr, gr, type="within"))
+  
   # subset the variants to those that overlap the target GRanges and are canon
-  if (length(subsetByOverlaps(mvr, gr, type="within"))) {
-    mvr <- subsetByOverlaps(mvr, gr, type="within")
+  if (length(mvr)) {
+    
     #drop anything that has an N base.. this also looks like a weird bug?
     mvr <- mvr[!grepl("N", mvr@alt),]
+    
     #check again whether we've now cleared out all the variants
     #return an empty ranges if we have
     if (length(mvr) == 0) {
       mvr <- MVRanges(subsetByOverlaps(mvr, gr, type="within"))
     }
-  } else { mvr <- MVRanges(subsetByOverlaps(mvr, gr, type="within")) }
+  } 
   return(mvr)
 }
 
