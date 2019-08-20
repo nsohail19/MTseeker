@@ -24,7 +24,7 @@ initMTcircos <- function(x) {
 }
 
 # Actually plot the rings with the gene names
-genesMTcircos <- function(x, anno) {
+genesMTcircos <- function(x, anno, legends=F) {
 
   dat <- data.frame(name=names(anno), start=start(anno), end=end(anno))
   
@@ -45,6 +45,11 @@ genesMTcircos <- function(x, anno) {
   
   circos.track(panel.fun=pfun, ylim=c(-1,1), track.height=0.5, 
                track.margin=c(0,0), bg.border=NA)
+  
+  if (legends) {
+    legend("bottomleft", title="Regions",
+           legend=colDF$label, col=colDF$col, pch=15, cex=0.8)
+  }
   
   res <- list(anno=dat, pfun=pfun)
   return(res)
