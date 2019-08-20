@@ -17,6 +17,7 @@
 #' rawReads_1 <- MAlignments(rawReads[[1]], BAMs[1])
 #' plotMTCoverage(rawReads_1)
 #'
+#' @export
 rawMTreads <- function(bams) {
   
   # To return a list
