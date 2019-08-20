@@ -1,3 +1,33 @@
+#' Plot an empty circos plot of the mitochondrial genome
+#'
+#' @param mvr      MVRanges
+#'
+#' @return        Image of mitochondrial genome
+#'
+#'
+#' @examples 
+#' 
+#' library(MTseekerData)
+#' BAMdir <- system.file("extdata", "BAMs", package="MTseekerData")
+#' BAMs <- list.files(BAMdir, pattern="bam$")
+#' BAMs <- paste0(BAMdir, "/", BAMs)
+#' 
+#' pu <- pileupMT(BAMs[1], ref="rCRS)
+#' genMTcircos(pu)
+#' 
+#' 
+#'
+#' @export
+
+genMTcircos <- function(mvr) {
+  
+  circos.clear()
+  
+  anno <- initMTcircos(mvr)
+  genesMTcircos(mvr, anno, legends=T)
+  
+}
+
 # Initialize the circos plots
 initMTcircos <- function(x) {
 

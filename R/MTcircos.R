@@ -4,7 +4,6 @@
 #' if you want to fiddle with the details, crack open the code and modify it...
 #' or alternatively, add sectors/dendrograms inside of this "framed" version.
 #'
-#' FIXME: add variant type coloration (del=blue, SNV=black, ins=red) 
 #' 
 #' @param variants  optional MVRanges or MVRangesList to split by strand & plot
 #' @param outside   optional MVRanges or MVRangesList to plot outside the circle
@@ -32,9 +31,18 @@
 #' title("Renal oncocytomas and normal kidney samples")
 #' 
 #' @export 
-MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL, 
-                     incol=NULL, anno=NULL, how=c("matrix","VAF"), ...) {
+MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=NULL, 
+                     incol=NULL, anno=NULL, how=c("matrix","VAF", "AA"), ...) {
   circos.clear() 
+  
+  if (length(how) > 1) {
+    how <- "matrix"
+  }
+  
+  if (how == "AA") {
+    message("Must run decomposeAndCalcConsequences() before plottting AA changes")
+    stop()
+  }
   
   anno <- initMTcircos(variants)
   dat <- data.frame(name=names(anno), start=start(anno), end=end(anno))
@@ -48,31 +56,85 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
     inside <- stranded$light
   } 
   
-  # outside track: variant annotations (use granges() if outside is an MVRL)
+  # Outside track
   if (!is.null(outside)) {
-    bed1 <- .makeBed(outside)
-    if (is.null(outcol)) outcol <- .newsprint
-    circos.genomicHeatmap(bed1, outcol, line_col=.colorCode(bed1$chr), 
-                          track.margin=c(0,0), side="outside", border=NA,
-                          line_lwd=2) # how to color-code the "matrix" itself?
-  } else { 
+    
+    # Color code according to AA changes
+    if (how == "AA") {
+      message("Working on it, AA")
+    }
+    
+    # Transparency according to VAF
+    else if (how == "VAF") {
+      message("Working on it, VAF")
+    }
+    
+    else {
+      # Color coding for the variants
+      # del=blue, SNV=black, ins=red
+      bed1 <- .makeColoredMatrix(outside)
+      col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
+      circos.genomicHeatmap(bed1, outcol, line_col=.colorCode(bed1$chr), col = col_fun,
+                            track.margin=c(0,0), side="outside", border=NA,
+                            line_lwd=2) 
+      
+    }
+    
+  }
+  else {
     circos.track(track.height=0.15, ylim=c(0,1), bg.border=NA)
   }
   
   # main track, gene names and such
   res <- genesMTcircos(variants, anno)
   
-  # inside track: 
+  # Inside track
   if (!is.null(inside)) {
-    bed2 <- .makeBed(inside)
-    if (is.null(incol)) incol <- .newsprint
-    circos.genomicHeatmap(bed2, incol, line_col=.colorCode(bed2$chr),
-                          track.margin=c(0,0), side="inside", border=NA)
-  } else { 
+    
+    # Color code according to AA changes
+    if (how == "AA") {
+      message("Working on it, AA")
+    }
+    
+    # Transparency according to VAF
+    else if (how == "VAF") {
+      message("Working on it, VAF")
+    }
+    
+    else {
+      # Color coding for the variants
+      # del=blue, SNV=black, ins=red
+      bed2 <- .makeColoredMatrix(inside)
+      col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
+      circos.genomicHeatmap(bed2, outcol, line_col=.colorCode(bed1$chr), col = col_fun,
+                            track.margin=c(0,0), side="outside", border=NA,
+                            line_lwd=2) 
+      
+    }
+    
+  }
+  else {
     circos.track(track.height=0.15, ylim=c(0,1), bg.border=NA)
   }
   
+  # Color code according to AA changes
+  if (how == "AA") {
+    message("Working on it, AA")
+  }
+  
+  # Transparency according to VAF
+  else if (how == "VAF") {
+    message("Working on it, VAF")
+  }
+  
+  else {
+    legend("bottomleft", title="Type of Variant",
+           legend=c("Insertion", "Deletion", "SNV"), col=c("red", "blue", "black"), pch=15, cex=0.8)
+  }
+ 
+  
   invisible(res)
+  
 }
 
 
@@ -92,7 +154,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   message("This will take a moment")
 
   # Iterate through each variant and call locateVariant
-  newMvr <- locateVariants(mvr[1])
+  newMvr <- locateMTvariants(mvr[1])
   for (i in 2:length(mvr)) {
     newVar <- locateVariants(mvr[i])
     newMvr <- append(newMvr, newVar)
@@ -119,4 +181,55 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   bed <- as.data.frame(gr)[, c("gene", "start", "end")]
   bed$value <- 1
   return(bed)
+}
+
+
+.makeColoredMatrix <- function(mvr) {
+  
+  # Making a colored matrix
+  allNames <- lapply(mvr, names)
+  allNames <- unique(unlist(unname(allNames)))
+  
+  rowNam <- c("chr", "start", "end")
+  rowNam <- append(rowNam, names(mvr))
+  
+  m <- matrix(0, ncol = length(rowNam), nrow = length(allNames))
+  typeDF <- data.frame(m)
+  names(typeDF) <- rowNam
+  rownames(typeDF) <- allNames
+  
+  for (i in 1:length(mvr)) {
+    
+    rowInd <- which(allNames %in% names(mvr[[i]]))
+    rowOverlapNames <- allNames[rowInd]
+    
+    snvs <- rowOverlapNames[grep(">", rowOverlapNames)]
+    ins <- rowOverlapNames[grep("ins", rowOverlapNames)]
+    dels <- rowOverlapNames[grep("del", rowOverlapNames)]
+    
+    if (length(ins)) {
+      typeDF[ins,][,i + 3] <- 1
+    }
+    
+    if (length(snvs)) {
+      typeDF[snvs,][,i + 3] <- 2
+    }
+    
+    if (length(dels)) {
+      typeDF[dels,][,i + 3] <- 3
+    } 
+  }
+  
+  split <- gsub("[^0-9\\_]", "", allNames) 
+  pos <- as.numeric(sub("_[^_]+$", "", split))
+  
+  typeDF$start <- pos
+  typeDF$end <- pos
+  
+  anno <- suppressMessages(getAnnotations(testPu_anno))
+  ov <- findOverlaps(IRanges(typeDF$start, typeDF$end), ranges(anno))
+  
+  typeDF$chr <- names(anno)[subjectHits(ov)]
+  
+  return(typeDF)
 }
