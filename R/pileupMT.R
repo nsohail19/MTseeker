@@ -490,6 +490,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         }
         
         # Odd 1 off error that should be deleting the N at 3107
+        # Showed up in TCGA data
         if (ref == "rCRS" && startPos == 3105 && delLength == 1) {
           startPos <- startPos + 1
           altIndexStart <- altIndexStart + 1
@@ -536,6 +537,11 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
           if (length(haploDels) > 0) {
             #message(paste("Potential haplogroup deletion variant at position:", as.character(startPos), "for sample:",as.character(mcols(indelRead)$bam)))
             potentialHaplo <- TRUE
+          }
+          
+          else if (startPos == 3106) {
+            # Continue
+            # A lot of the bp before the N at 3107 are different
           }
           
           else {
