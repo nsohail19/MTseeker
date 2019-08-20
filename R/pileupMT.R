@@ -448,7 +448,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
           haploIns <- subsetByOverlaps(ranges(haplomask_whitelist[[3]]), IRanges(startPos, endPos))
           
           if (length(haploIns) > 0) {
-            message(paste("Potential haplogroup insertion variant at position:", as.character(startPos), "for sample:", as.character(mcols(indelRead)$bam)))
+            #message(paste("Potential haplogroup insertion variant at position:", as.character(startPos), "for sample:", as.character(mcols(indelRead)$bam)))
             potentialHaplo <- TRUE
           }
           
@@ -487,6 +487,12 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         if (ref == "rCRS" && startPos == 3107 && delLength == 1) {
           startPos <- startPos - 1
           altIndexStart <- altIndexStart - 1
+        }
+        
+        # Odd 1 off error that should be deleting the N at 3107
+        if (ref == "rCRS" && startPos == 3105 && delLength == 1) {
+          startPos <- startPos + 1
+          altIndexStart <- altIndexStart + 1
         }
         
         endPos <- startPos + delLength
@@ -528,12 +534,12 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
           #haploIns <- subsetByOverlaps(ranges(haplomask_whitelist[[3]]), IRanges(startPos, endPos))
           
           if (length(haploDels) > 0) {
-            message(paste("Potential haplogroup deletion variant at position:", as.character(startPos), "for sample:",as.character(mcols(indelRead)$bam)))
+            #message(paste("Potential haplogroup deletion variant at position:", as.character(startPos), "for sample:",as.character(mcols(indelRead)$bam)))
             potentialHaplo <- TRUE
           }
           
           else {
-            message(paste("Incorrect insertion for indel read index:", as.character(index), "for", as.character(mcols(indelRead)$bam)))
+            message(paste("Incorrect deletion for indel read index:", as.character(index), "for", as.character(mcols(indelRead)$bam)))
             comp <- .sanCheck(reference, startPos, indelRead, softPos, refs, alt, splitCigar)
           }
         }
