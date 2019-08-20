@@ -154,7 +154,6 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     # Returns the ref and alt read for each variant
     #lapply(indelReads, .reverseCigar, ref=ref, reference=refSeqDNA)
     for (i in 1:length(indelReads)) {
-      print(i)
       newIndelReads <- append(newIndelReads, .reverseCigar(indelReads[i], ref, refSeqDNA, i))
     }
      
