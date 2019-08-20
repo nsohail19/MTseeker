@@ -40,7 +40,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   
   # Stop if the user forget to specify a reference genome
   if (length(ref) > 1) {
-    stop("Forgot to set a reference genome! MTseeker currently supports: ", paste(names(refSeqLengths), collapse= ", "))
+    stop("You forgot to set a reference genome! MTseeker currently supports: ", paste(names(refSeqLengths), collapse= ", "))
   }
   
   # scant support for other mitogenomes
@@ -150,10 +150,11 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     
     # Empty GAlignment that will have new indels appended to it
     newIndelReads <- indelReads[0]
-
+    
     # Returns the ref and alt read for each variant
     #lapply(indelReads, .reverseCigar, ref=ref, reference=refSeqDNA)
     for (i in 1:length(indelReads)) {
+      print(i)
       newIndelReads <- append(newIndelReads, .reverseCigar(indelReads[i], ref, refSeqDNA, i))
     }
      
@@ -440,7 +441,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         
         # A simple test to make sure insertion was done correctly
         # That became less simple
-        if (altInd[1] != refs) {
+        else if (altInd[1] != refs) {
           
           # If the variants falls within a haplogroup region
           # Just leave it be
@@ -528,7 +529,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         
         # A simple check to ensure the deletion is supposedly happening correctly
         # That became less simple
-        if ( alt != refSplit[1] ) {
+        else if ( alt != refSplit[1] ) {
 
           # Keeps track if the variant falls in a common haplogroup region (ancestral variation)
           data(haplomask_whitelist)
