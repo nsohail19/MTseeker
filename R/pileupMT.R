@@ -84,7 +84,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   # can support multiple bams if we have sample names
   # perhaps it is worthwhile to autoextract them now
   
-  if (is.null(sbp)) sbp <- scanMT(bam) 
+  if (is.null(sbp)) sbp <- scanMT(bam, mapqFilter=20) 
   if (is.null(pup)) pup <- PileupParam(distinguish_strands=FALSE) 
   
   pu <- pileup(file=bam, scanBamParam=sbp, pileupParam=pup, ...)
