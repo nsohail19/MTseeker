@@ -46,7 +46,23 @@ genesMTcircos <- function(x, anno, legends=F) {
   circos.track(panel.fun=pfun, ylim=c(-1,1), track.height=0.5, 
                track.margin=c(0,0), bg.border=NA)
   
-  if (legends) {
+  if (legends && genome(x) == "rCRS") {
+    
+    # Get the colors to correspond which region they belong to
+    # Only support rCRS 
+    colDF <- as.data.frame(unique(anno$itemRgb), stringsAsFactors=F)
+    names(colDF) <- "col"
+    
+    colDF$label <- NA_character_
+    colDF$label[1] <- "Control Region"
+    colDF$label[2] <- "D Loop"
+    colDF$label[3] <- "tRNA"
+    colDF$label[4] <- "rRNA"
+    colDF$label[5] <- "Complex I"
+    colDF$label[6] <- "Complex IV"
+    colDF$label[7] <- "Complex V"
+    colDF$label[8] <- "Complex III"
+    
     legend("bottomleft", title="Regions",
            legend=colDF$label, col=colDF$col, pch=15, cex=0.8)
   }
