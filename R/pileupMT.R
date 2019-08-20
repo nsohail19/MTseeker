@@ -493,11 +493,10 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         
         # Odd 1 off error that should be deleting the N at 3107
         # Showed up in TCGA data
-        ### Will adding more to pup make this obsolete
-        #if (ref == "rCRS" && startPos == 3105 && delLength == 1) {
-        #  startPos <- startPos + 1
-        #  altIndexStart <- altIndexStart + 1
-        #}
+        if (ref == "rCRS" && startPos == 3105 && delLength == 1) {
+          startPos <- startPos + 1
+          altIndexStart <- altIndexStart + 1
+        }
         
         endPos <- startPos + delLength
         
@@ -542,11 +541,10 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
             potentialHaplo <- TRUE
           }
           
-          ### Will adding to pup get rid of this
-          #else if (startPos == 3106) {
+          else if (startPos == 3106) {
             # Continue
             # A lot of the bp before the N at 3107 are different
-          #}
+          }
           
           else {
             message(paste("Incorrect deletion for indel read index:", as.character(index), "for", as.character(mcols(indelRead)$bam)))
