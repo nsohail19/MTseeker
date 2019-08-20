@@ -17,7 +17,6 @@
 #' rawReads_1 <- MAlignments(rawReads[[1]], BAMs[1])
 #' plotMTCoverage(rawReads_1)
 #'
-
 rawMTreads <- function(bams) {
   
   # To return a list
@@ -28,7 +27,7 @@ rawMTreads <- function(bams) {
   }
   
   else {
-    sbp <- scanMT(bams)
+    sbp <- scanMT(bams, mapqFilter=20)
     bamWhat(sbp) <- "seq"
     reads <- readGAlignments(file=bams, param=sbp)
     return(reads)
