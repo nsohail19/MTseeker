@@ -226,7 +226,7 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   typeDF$start <- pos
   typeDF$end <- pos
   
-  anno <- suppressMessages(getAnnotations(testPu_anno))
+  anno <- suppressMessages(getAnnotations(mvr))
   ov <- findOverlaps(IRanges(typeDF$start, typeDF$end), ranges(anno))
   
   typeDF$chr <- names(anno)[subjectHits(ov)]
