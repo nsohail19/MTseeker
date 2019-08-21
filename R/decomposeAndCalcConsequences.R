@@ -30,7 +30,7 @@
 #' 
 #' @export
 
-decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, ...) {
+decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, cores=1 ...) {
   #this will decompose non-disjoint ranges for injectMTVariants()
   if (!class(mvr) %in% c("MVRanges", "MVRangesList")) stop("Input is not an MVRanges or MVRangesList.")
   #mvr.ovlps <- findOverlaps(mvr, type = "any")
@@ -47,6 +47,8 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, ..
   
   #run serially
   else if (is(mvr, "MVRangesList") && !parallel) {
+    if (cores == 1) options("mc.cores"=detectCores()/2)
+    else options("mc.cores"=cores)
     mvrl <- MVRangesList(lapply(mvr, decomposeAndCalcConsequences, ...))
     return(mvrl)
     }
