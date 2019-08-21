@@ -103,7 +103,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
         } else {
           
           mcols(mvr)$AAchange[r] <- mcols(con)$consequences
-          if (mcols(mvr)$AAchange == "") mcols(mvr)$AAchange <- NA_character_
+          if (mcols(mvr)$AAchange[r] == "") mcols(mvr)$AAchange[r] <- NA_character_ 
           mcols(mvr)$typeMut[r] <- mcols(con)$typeMut
           
           mcols(mvr)$impacted.gene[r] <- mcols(con)$synonym
