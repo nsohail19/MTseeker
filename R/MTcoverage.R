@@ -62,7 +62,13 @@ MTcoverage <- function(x, ...) {
 #' @import    circlize
 #' 
 #' @export
-plotMTCoverage <- function(x, ...) { 
+plotMTcoverage <- function(x, ref=c("rCRS", "NC_005089"), ...) { 
+  browser()
+  
+  if (length(ref) > 1) {
+    message("You forgot to set a reference, current you can use: ", paste0(ref, sep=", "))
+    stop()
+  }
   
   circos.clear()
   
@@ -71,6 +77,9 @@ plotMTCoverage <- function(x, ...) {
   message("Plotting mitochondrial coverage...")
   
   ymax <- max(covg)
+  
+  # If you are plotting from the raw reads, the genome is not set yet
+  genome(x) <- ref
   
   # Initialize the circos plot
   anno <- initMTcircos(x)
