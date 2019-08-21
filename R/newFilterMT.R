@@ -163,6 +163,10 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
   }
   
   if ("PASS" %in% names(mcols(vars))) vars <- subset(vars, PASS)
+
+  # If it is empty, return the empty MVRanges
+  if (length(vars) == 0) return(vars)
+  
   names(vars) <- MTHGVS(vars)
   
   return(vars)
