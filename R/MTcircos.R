@@ -32,7 +32,7 @@
 #' 
 #' @export 
 MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=NULL, 
-                     incol=NULL, anno=NULL, how=c("matrix","VAF", "AA"), ...) {
+                     incol=NULL, anno=NULL, how=c("matrix", "AA"), ...) {
   circos.clear() 
 
   if (length(how) > 1) {
@@ -55,7 +55,7 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
     message("Replacing `inside` with light-strand variants...")
     inside <- stranded$light
   } 
-  
+
   # Outside track
   if (!is.null(outside) && length(outside) != 0) {
     
@@ -64,17 +64,14 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
       message("Working on it, AA")
     }
     
-    # Transparency according to VAF
-    else if (how == "VAF") {
-      message("Working on it, VAF")
-    }
-    
     else {
       # Color coding for the variants
       # del=blue, SNV=black, ins=red
       bed1 <- .makeColoredMatrix(outside)
-      col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
-      circos.genomicHeatmap(bed1, outcol, line_col=.colorCode(bed1$chr), col = col_fun,
+      vafBed1 <- .vafMatrix(bed1, outside)
+
+      #col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
+      circos.genomicHeatmap(bed1, outcol, line_col=.colorCode(bed1$chr), col = vafBed1[,4:ncol(vafBed1)],
                             track.margin=c(0,0), side="outside", border=NA,
                             line_lwd=2) 
       
@@ -96,20 +93,16 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
       message("Working on it, AA")
     }
     
-    # Transparency according to VAF
-    else if (how == "VAF") {
-      message("Working on it, VAF")
-    }
-    
     else {
-      # Color coding for the variants
       # del=blue, SNV=black, ins=red
+
       bed2 <- .makeColoredMatrix(inside)
-      col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
-      circos.genomicHeatmap(bed2, outcol, line_col=.colorCode(bed1$chr), col = col_fun,
-                            track.margin=c(0,0), side="outside", border=NA,
+      vafBed2 <- .vafMatrix(bed2, inside)
+
+      #col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
+      circos.genomicHeatmap(bed2, outcol, line_col=.colorCode(bed2$chr), col = vafBed2[,4:ncol(vafBed2)],
+                            track.margin=c(0,0), side="inside", border=NA,
                             line_lwd=2) 
-      
     }
     
   }
@@ -206,7 +199,9 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
 
   names(typeDF) <- rowNam
   rownames(typeDF) <- allNames
-  
+
+  # Figure out which of the variants in a sample is SNV, ins, del
+  # Assign color according to the unique values set for each type of variant
   for (i in 1:numSamples) {
     
     # MVRangesList
@@ -219,11 +214,11 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
       rowOverlapNames <- allNames
     }
 
-    
     snvs <- rowOverlapNames[grep(">", rowOverlapNames)]
     ins <- rowOverlapNames[grep("ins", rowOverlapNames)]
     dels <- rowOverlapNames[grep("del", rowOverlapNames)]
     
+    # del=blue, SNV=black, ins=red
     if (length(ins)) {
       typeDF[ins,][,i + 3] <- 1
     }
@@ -236,17 +231,76 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
       typeDF[dels,][,i + 3] <- 3
     } 
   }
-  
-  split <- gsub("[^0-9\\_]", "", allNames) 
-  pos <- as.numeric(sub("_[^_]+$", "", split))
-  
-  typeDF$start <- pos
-  typeDF$end <- pos
-  
+
+  # Get the start and end position for each variants
+  for (j in 1:numSamples) {
+
+    hits <- which(typeDF[,j + 3] != 0)
+    varNames <- allNames[hits]
+    
+    vars <- mvr[[j]][varNames]
+    varStart <- start(vars)
+    varEnd <- end(vars)
+    
+    typeDF$start[hits] <- varStart
+    typeDF$end[hits] <- varEnd
+  }
+
+  # Get the names of the genes each variant is found in
   anno <- suppressMessages(getAnnotations(mvr))
   ov <- findOverlaps(IRanges(typeDF$start, typeDF$end), ranges(anno))
+
+  # If there are overlapping genes
+  # Only list the first gene it overlaps in
+  firstOv <- ov[match(unique(queryHits(ov)), queryHits(ov)), ]
   
-  typeDF$chr <- names(anno)[subjectHits(ov)]
+  typeDF$chr <- names(anno)[subjectHits(firstOv)]
 
   return(typeDF)
+}
+
+.vafMatrix <- function(bed, mvr) {
+
+  vafs <- bed
+  vafs[,4:ncol(vafs)] <- 0
+
+  # Get the VAF for each variants
+  for (j in 1:(ncol(bed) - 3)) {
+    
+    hits <- which(bed[,j + 3] != 0)
+    varNames <- row.names(bed)[hits]
+    
+    vars <- mvr[[j]][varNames]
+    varVAF <- vars$VAF
+    
+    vafs[,j + 3][hits] <- varVAF
+  }
+
+  # Transparancy goes from a scale of 0-255
+  #copy[,4:ncol(vafs)] * 255
+  #return(vafs)
+  
+  #vafBed1 <- .vafMatrix(typeDF, mvr)
+  #adjustcolor(typeDF[,4][1], alpha.f=vafBed1[,4][1])
+
+  # Nonzero elements
+  
+  nonzero <- which(bed[,4:ncol(bed)] !=0, arr.ind=T)
+  for (k in 1:nrow(nonzero)) {
+    
+    # 1 is the row
+    # 2 is the column
+    rows <- nonzero[k,][1]
+    cols <- nonzero[k,][2]
+    
+    #col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
+    if (bed[rows,][cols + 3] == 1) bed[rows,][cols + 3] <- "red"
+    else if (bed[rows,][cols + 3] == 2) bed[rows,][cols + 3] <- "black"
+    else if (bed[rows,][cols + 3] == 3) bed[rows,][cols + 3] <- "blue"
+
+    bed[rows,][cols + 3] <- adjustcolor(col = bed[rows,][cols + 3], 
+                                        alpha.f = vafs[rows,][cols + 3])
+  }
+   
+  return(bed)
 }

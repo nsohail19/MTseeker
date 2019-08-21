@@ -93,7 +93,7 @@ genesMTcircos <- function(x, anno, legends=F) {
     colDF$label[7] <- "Complex V"
     colDF$label[8] <- "Complex III"
     
-    legend("topright", title="Regions",
+    legend("topleft", title="Regions", ncol=2,
            legend=colDF$label, col=colDF$col, pch=15, cex=0.8)
   }
   
