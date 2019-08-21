@@ -61,8 +61,11 @@ MTcoverage <- function(x, ...) {
 #' 
 #' @import    circlize
 #' 
+#' @param x         an MAlignments or MVRanges
+#' @param ref       string denoting reference sequence to use
+#' 
 #' @export
-plotMTcoverage <- function(x, ref=c("rCRS", "NC_005089"), ...) { 
+plotMTCoverage <- function(x, ref=c("rCRS", "NC_005089"), ...) { 
   browser()
   
   if (length(ref) > 1) {
