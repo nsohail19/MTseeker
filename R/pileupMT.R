@@ -227,10 +227,13 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     data(haplomask_whitelist)
     mvr$potentialHaplo <- FALSE
     #haploSnps <- subsetByOverlaps(ranges(haplomask_whitelist[[1]]), IRanges(startPos, endPos))
-    for (i in 1:nrow(pu)) {
-      haploSnps <- subsetByOverlaps(ranges(haplomask_whitelist[[1]]), IRanges(pu[i,]$pos, pu[i,]$pos))
-      if (length(haploSnps) > 0) mvr[i]$potentialHaplo <- TRUE
+    if (ref == "rCRS") {
+      for (i in 1:nrow(pu)) {
+        haploSnps <- subsetByOverlaps(ranges(haplomask_whitelist[[1]]), IRanges(pu[i,]$pos, pu[i,]$pos))
+        if (length(haploSnps) > 0) mvr[i]$potentialHaplo <- TRUE
+      }
     }
+
     
     names(mvr) <- MTHGVS(mvr)
   }
@@ -449,7 +452,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
           #haploDels <- subsetByOverlaps(ranges(haplomask_whitelist[[2]]), IRanges(startPos, endPos))
           haploIns <- subsetByOverlaps(ranges(haplomask_whitelist[[3]]), IRanges(startPos, endPos))
           
-          if (length(haploIns) > 0) {
+          if (length(haploIns) > 0 && ref == "rCRS") {
             #message(paste("Potential haplogroup insertion variant at position:", as.character(startPos), "for sample:", as.character(mcols(indelRead)$bam)))
             potentialHaplo <- TRUE
           }
@@ -536,7 +539,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
           haploDels <- subsetByOverlaps(ranges(haplomask_whitelist[[2]]), IRanges(startPos, endPos))
           #haploIns <- subsetByOverlaps(ranges(haplomask_whitelist[[3]]), IRanges(startPos, endPos))
           
-          if (length(haploDels) > 0) {
+          if (length(haploDels) > 0 && ref == "rCRS") {
             #message(paste("Potential haplogroup deletion variant at position:", as.character(startPos), "for sample:",as.character(mcols(indelRead)$bam)))
             potentialHaplo <- TRUE
           }
