@@ -32,14 +32,14 @@ genMTcircos <- function(mvr) {
 initMTcircos <- function(x) {
 
   # Human
-  if (genome(x) == "rCRS") {
+  if (unique(genome(x)) == "rCRS") {
     data(mtAnno.rCRS)
     anno <- mtAnno #.rCRS
     refWidth <- 16569
   }
   
   # Mouse
-  else if (genome(x) == "NC_005089") {
+  else if (unique(genome(x)) == "NC_005089") {
     anno <- readRDS("~/Documents/pileupTesting/NC_005089genome/MTmouseAnno.rds")
     refWidth <- 16299
   }

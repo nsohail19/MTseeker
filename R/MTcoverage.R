@@ -66,11 +66,24 @@ MTcoverage <- function(x, ...) {
 #' 
 #' @export
 plotMTCoverage <- function(x, ref=c("rCRS", "NC_005089"), ...) { 
-  browser()
-  
+
   if (length(ref) > 1) {
     message("You forgot to set a reference, current you can use: ", paste0(ref, sep=", "))
     stop()
+  }
+  
+  if (length(x) > 1) {
+    message("You can only plot the coverage of 1 sample at a time")
+    stop()
+  }
+  
+  if (is(x, "GAlignmentsList")) {
+    x <- unlist(x)
+  }
+
+  if (is(x, "GAlignments")) {
+    bams <- unique(mcols(x)$bam)
+    x <- MAlignments(x, bams)
   }
   
   circos.clear()

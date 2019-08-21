@@ -35,6 +35,7 @@ setClass("MAlignmentsList", contains="GAlignmentsList")
 #' @export
 MAlignmentsList <- function(...) {
 
+  browser()
   # this must be done first: 
   mdat <- list()
   #check for genomeSize to be 0 in a list

@@ -31,6 +31,9 @@ rawMTreads <- function(bams) {
     sbp <- scanMT(bams, mapqFilter=20)
     bamWhat(sbp) <- "seq"
     reads <- readGAlignments(file=bams, param=sbp)
+
+    # Save the bam if they want to plot the coverage later
+    mcols(reads)$bam <- bams
     return(reads)
   }
 }
