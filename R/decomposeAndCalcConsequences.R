@@ -46,7 +46,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, ..
   }
   
   #run serially
-  if (is(mvr, "MVRangesList")) {
+  else if (is(mvr, "MVRangesList") && !parallel) {
     mvrl <- MVRangesList(lapply(mvr, decomposeAndCalcConsequences, ...))
     return(mvrl)
     }
