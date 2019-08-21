@@ -107,18 +107,22 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
       else submvr[i]$typeMut <- "missense"
     }
     
-    #### MAY HAVE TO GET ALTD SEQUENCE BASED UPON INS OR DELETION
-    #### IF THERE IS AN INSERTION, THE START AND END CODONS WILL BE DIFFERENT
     # Insertions
     else if (grepl("ins", names(submvr[i]))) {
-      if ( (nchar(alt(submvr[i])) - 1)  %% 3 == 0 ) submvr[i]$typeMut <- "insertion"
+      if ( (nchar(alt(submvr[i])) - 1)  %% 3 == 0 ) {
+        submvr[i]$typeMut <- "insertion"
+        orig <- extractAt(gr[g]$refAA, IRanges(submvr[i]$startCodon, submvr[i]$startCodon))
+      }
       else submvr[i]$typeMut <- "frameshift"
     }
     
     # Deletions
     else {
-      if ( (nchar(ref(submvr[i])) - 1) %% 3 == 0) submvr[i]$typeMut <- "deletion"
-          else submvr[i]$typeMut <- "frameshift"
+      if ( (nchar(ref(submvr[i])) - 1) %% 3 == 0) {
+        submvr[i]$typeMut <- "deletion"
+        altd <- extractAt(gr[g]$varAA, IRanges(submvr[i]$startCodon, submvr[i]$startCodon))
+      } 
+      else submvr[i]$typeMut <- "frameshift"
       
     }
     

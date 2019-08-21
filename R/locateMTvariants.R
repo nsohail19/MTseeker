@@ -86,7 +86,7 @@ locateMTvariants <- function(query) {
     subHit <- subjectHits(ol)[i]
 
     # FOR SOME REASON MT-ND6 DOES NOT CREATE THE TYPICAL 
-    if (names(anno[subHit]) == "MT-ND6") {
+    #if (names(anno[subHit]) == "MT-ND6") {
       
       #browser()
       #MT_CODE <- getGeneticCode("SGC1")
@@ -95,7 +95,7 @@ locateMTvariants <- function(query) {
       #refAA <- suppressWarnings(translate(refDNA, MT_CODE))
 
       #offset <- suppressWarnings(translate(extractAt(unlist(refDNA), IRanges(4, width(refAA))), MT_CODE))
-    }
+    #}
 
     # Does the variant fall into a coding, tRNA, rRNA, or D-loop region
     query[i]$region <- anno[subHit]$region
@@ -105,11 +105,11 @@ locateMTvariants <- function(query) {
     query[i]$localStart <- start(query[i]) - start(anno[subHit]) + 1
     query[i]$localEnd <- end(query[i]) - start(anno[subHit]) + 1
     
-    if (genome(query) == "rCRS" && names(anno[subHit]) == "MT-ND6") {
-      
-      query[i]$localStart <- start(query[i]) - start(anno[subHit]) + 1 - 2
-      query[i]$localEnd <- end(query[i]) - start(anno[subHit]) + 1 - 2
-    }
+    #if (genome(query) == "rCRS" && names(anno[subHit]) == "MT-ND6") {
+    #  
+    #  query[i]$localStart <- start(query[i]) - start(anno[subHit]) + 1 - 2
+    #  query[i]$localEnd <- end(query[i]) - start(anno[subHit]) + 1 - 2
+    #}
     
     # Local codon starts and ends
     # Taking a conservative approach

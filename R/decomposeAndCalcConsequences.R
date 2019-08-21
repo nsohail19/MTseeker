@@ -90,6 +90,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, ..
           newMvr <- mvr[r]
           
           mcols(newMvr)$AAchange <- mcols(con)$consequences[2]
+          if (mcols(newMvr)$AAchange == "") mcols(newMvr)$AAchange <- NA_character_
           mcols(newMvr)$typeMut <- mcols(con)$typeMut[2]
           
           mcols(newMvr)$impacted.gene <- mcols(con)$synonym[2]
@@ -100,6 +101,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, ..
         } else {
           
           mcols(mvr)$AAchange[r] <- mcols(con)$consequences
+          if (mcols(mvr)$AAchange == "") mcols(newMvr)$AAchange <- NA_character_
           mcols(mvr)$typeMut[r] <- mcols(con)$typeMut
           
           mcols(mvr)$impacted.gene[r] <- mcols(con)$synonym
