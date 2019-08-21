@@ -34,12 +34,12 @@
 MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=NULL, 
                      incol=NULL, anno=NULL, how=c("matrix","VAF", "AA"), ...) {
   circos.clear() 
-  
+
   if (length(how) > 1) {
     how <- "matrix"
   }
-  
-  if (how == "AA") {
+
+  if (how == "AA" && !("typeMut" %in% names(mcols(variants[[1]])))) {
     message("Must run decomposeAndCalcConsequences() before plottting AA changes")
     stop()
   }
@@ -47,7 +47,7 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   anno <- initMTcircos(variants)
   dat <- data.frame(name=names(anno), start=start(anno), end=end(anno))
   
-  if (!is.null(variants)) {
+  if (!is.null(variants) && length(variants) != 0) {
     message("Splitting variants by strand...")
     stranded <- byStrand(variants, anno)
     message("Replacing `outside` with heavy-strand variants...")
@@ -57,7 +57,7 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   } 
   
   # Outside track
-  if (!is.null(outside)) {
+  if (!is.null(outside) && length(outside) != 0) {
     
     # Color code according to AA changes
     if (how == "AA") {
@@ -86,10 +86,10 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   }
   
   # main track, gene names and such
-  res <- genesMTcircos(variants, anno)
+  res <- genesMTcircos(variants, anno, legends=T)
   
   # Inside track
-  if (!is.null(inside)) {
+  if (!is.null(inside) && length(inside) != 0) {
     
     # Color code according to AA changes
     if (how == "AA") {
@@ -185,23 +185,40 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
 
 
 .makeColoredMatrix <- function(mvr) {
-  
+
   # Making a colored matrix
-  allNames <- lapply(mvr, names)
-  allNames <- unique(unlist(unname(allNames)))
-  
+  if (is(mvr, "MVRangesList")) {
+    allNames <- lapply(mvr, names)
+    allNames <- unique(unlist(unname(allNames)))
+    numSamples <- length(mvr)
+  } else {
+    allNames <- unique(names(mvr))
+    numSamples <- 1
+  }
+
   rowNam <- c("chr", "start", "end")
-  rowNam <- append(rowNam, names(mvr))
+
+  if (numSamples == 1) rowNam <- append(rowNam, unique(as.character(sampleNames(mvr))))
+  else rowNam <- append(rowNam, names(mvr))
   
   m <- matrix(0, ncol = length(rowNam), nrow = length(allNames))
   typeDF <- data.frame(m)
+
   names(typeDF) <- rowNam
   rownames(typeDF) <- allNames
   
-  for (i in 1:length(mvr)) {
+  for (i in 1:numSamples) {
     
-    rowInd <- which(allNames %in% names(mvr[[i]]))
-    rowOverlapNames <- allNames[rowInd]
+    # MVRangesList
+    if (! (numSamples == 1) ) {
+      rowInd <- which(allNames %in% names(mvr[[i]]))
+      rowOverlapNames <- allNames[rowInd]
+    }
+    # MVRanges
+    else {
+      rowOverlapNames <- allNames
+    }
+
     
     snvs <- rowOverlapNames[grep(">", rowOverlapNames)]
     ins <- rowOverlapNames[grep("ins", rowOverlapNames)]
@@ -230,6 +247,6 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   ov <- findOverlaps(IRanges(typeDF$start, typeDF$end), ranges(anno))
   
   typeDF$chr <- names(anno)[subjectHits(ov)]
-  
+
   return(typeDF)
 }
