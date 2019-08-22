@@ -59,7 +59,8 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
     res <- as.data.frame(read_json(url, simplifyVector=TRUE)$variants, stringsAsFactors=F)
     
     # If mitimpact gives a valid result
-    if (nrow(res) > 0 ) {
+    # Mitimpact does not handle insertions and deletion?
+    if (nrow(res) > 0 && !(grepl("ins|del", names(mvr[i])))) {
       
       # Rename the variant and paste together a simpler version of the consequences
       res$genomic <- with(res, paste0("m.", Start, Ref, ">", Alt))
