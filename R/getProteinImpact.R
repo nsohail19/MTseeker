@@ -2,19 +2,32 @@
 #'
 #' @name getProteinImpact
 #'
-#' @param mvr    An MVRangesList or MVRanges object
+#' @param mvr         An MVRangesList or MVRanges object
 #' @param parallel    Whether to run things in parallel
-#' @param ...    Other arguments to pass to injectMTVariants
+#' 
 #'
-#' @return    Annotated variants
+#' @return            Annotated variants
 #'
+#' @import            jsonlite
 #' @examples
 #' 
 #' 
-#' 
-#' 
+#' @export
+
 getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
 
+  # Set the number of cores if running in parallel
+  if (parallel) options(mc.cores = cores)
+  if (parallel & cores == 1) options(mc.cores = detectCores()/2)
+  
+  if (is(mvr, "MVRangesList")) {
+
+    if (parallel) mvrl <- MVRangesList(mclapply(mvr, getProteinImpact))
+    else mvrl <- MVRangesList(lapply(mvr, getProteinImpact))
+    
+    return(mvrl)
+  }
+  
   stopifnot(is(mvr, "MVRanges"))
   
   message("Processing consequences for ", sampleNames(mvr)@values)
@@ -30,7 +43,7 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
   mvr$impacted.gene <- NA_character_
   mvr$overlapGene <- NA_character_
   mvr$apogee <- TRUE
-  
+
   for (i in 1:length(mvr)) {
 
     # Get the url and scrape the information from mitimpact
@@ -69,6 +82,7 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
         
         if (mitOut$Ref[index] != ref(mvr[i])) {
           message("Reference disparity between APOGEE and pileup")
+          browser()
         }
         
         out <- mitOut[index,]
@@ -85,13 +99,15 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
     
   } #for
  
-  # When using decomp, if there are no AA changes, it will set it to ""
-  # Setting it to NA if someone wants to remove synonymous mutation
+  # When using decompAndCalcCons, if there are no AA changes, it will set it to ""
+  # Setting it to NA if someone wants to remove synonymous mutation later on
   mvr[which(mvr$AAchange == "")]$AAchange <- NA_character_
   mvr[which(!mvr$apogee)]$impacted.gene <- paste0("MT-", mvr[which(!mvr$apogee)]$impacted.gene) 
   
-  mvr <- .typeOfMutation(mvr)
-  
+  # Adds a column determing type of mutation
+  # Missense, synonymous, nonsense, insertion, deletion, or frameshift
+  mvr <- .typeMutation(mvr)
+
   return(mvr) 
 }
 
@@ -105,7 +121,7 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
   gr <- genes(mvr)
   stopifnot(unique(genome(gr)) == "rCRS")
   
-  mvr <- MVRanges(subsetByOverlaps(mvr, gr, type="within"))
+  mvr <- MVRanges(subsetByOverlaps(mvr, gr, type="within"), coverage=genomeCoverage(mvr))
   
   # subset the variants to those that overlap the target GRanges and are canon
   if (length(mvr)) {
@@ -123,7 +139,7 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
 }
 
 # helper fn to determine type of mutation
-.typeOfMutation <- function(mvr) {
+.typeMutation <- function(mvr) {
   
   mvr$typeMut <- NA_character_
 
@@ -140,8 +156,10 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
     missOrNon <- which(!is.na(mvr[snp]$AAchange))
     for (i in 1:length(missOrNon)) {
       index <- missOrNon[i]
-      aaChange <- unlist(strsplit(stri_replace(mvr[snp]$AAchange[index], " ", regex="\\d+"), " "))
       
+      # Want to split up the consequences ex. V12I to becomes "V" and "I" 
+      # Where V is the ref AA and I is the alt AA to determine what change took place
+      aaChange <- unlist(strsplit(gsub("\\d+", " ", mvr[snp]$AAchange[index]), " "))
       
       if ("*" %in% aaChange[2]) mvr[snp]$typeMut[index] <- "nonsense"
       else mvr[snp]$typeMut[index] <- "missense"
