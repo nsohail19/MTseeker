@@ -116,7 +116,6 @@ locateMTvariants <- function(query) {
       show(refSeq)
       show(ref(query[i]))
       
-      browser()
       
       query[i]$localStart <- query[i]$localStart + 54
       query[i]$localEnd <- query[i]$localEnd + 54

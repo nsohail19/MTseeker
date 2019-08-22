@@ -69,7 +69,6 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
         
         if (mitOut$Ref[index] != ref(mvr[i])) {
           message("Reference disparity between APOGEE and pileup")
-          browser()
         }
         
         out <- mitOut[index,]
