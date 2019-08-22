@@ -85,7 +85,8 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   # perhaps it is worthwhile to autoextract them now
   
   if (is.null(sbp)) sbp <- scanMT(bam, mapqFilter=20) 
-  if (is.null(pup)) pup <- PileupParam(distinguish_strands=FALSE, 
+  bamWhat(sbp) <- "strand"
+  if (is.null(pup)) pup <- PileupParam(distinguish_strands=TRUE, 
                                        distinguish_nucleotides=TRUE, ignore_query_Ns=TRUE, 
                                        include_deletions=TRUE, include_insertions=TRUE) 
   
@@ -103,10 +104,13 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   
   # Name of the bam/sample
   sampNames <- base::sub(paste0(".", ref), "", base::sub(".bam", "",  basename(bam)))
-  
+
   # number of reads * length of reads / length of ref sequence
   covg <- round(numReads * readsWidth / width(refSeqDNA))
   if (is.na(covg)) covg <- 0
+  
+  #data("anno_rCRS")
+  #lightStrand <- subset(mtAnno, strand == "-")
   
   # will need to handle '-' and '+' separately 
   indels <- subset(pu, nucleotide %in% c('-', '+'))

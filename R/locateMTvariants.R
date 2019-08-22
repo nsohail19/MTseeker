@@ -38,6 +38,7 @@ locateMTvariants <- function(query) {
   
   # Localized genic coordinates
   # Ben said he was interested in looking at tRNA regions 
+  ### Figure this out later
   #anno <- subset(mtAnno, region %in% c("tRNA", "coding"))
   
   # decomposeAndCalc throws me an error when I try to use tRNA
@@ -84,19 +85,7 @@ locateMTvariants <- function(query) {
   for (i in 1:length(query)) {
     
     subHit <- subjectHits(ol)[i]
-
-    # FOR SOME REASON MT-ND6 DOES NOT CREATE THE TYPICAL 
-    #if (names(anno[subHit]) == "MT-ND6") {
-      
-      #browser()
-      #MT_CODE <- getGeneticCode("SGC1")
-      #gr <- genes(query)
-      #refDNA <- getSeq(rCRSeq, gr["MT-ND6"])
-      #refAA <- suppressWarnings(translate(refDNA, MT_CODE))
-
-      #offset <- suppressWarnings(translate(extractAt(unlist(refDNA), IRanges(4, width(refAA))), MT_CODE))
-    #}
-
+    
     # Does the variant fall into a coding, tRNA, rRNA, or D-loop region
     query[i]$region <- anno[subHit]$region
     
@@ -105,28 +94,30 @@ locateMTvariants <- function(query) {
     query[i]$localStart <- start(query[i]) - start(anno[subHit]) + 1
     query[i]$localEnd <- end(query[i]) - start(anno[subHit]) + 1
     
-    if (genome(query) == "rCRS" && names(anno[subHit]) == "MT-ND6") {
-      
-      subir <- IRanges(query[i]$localStart, query[i]$localEnd)
-      data(rCRSeq, package="MTseeker")
-      anno$refDNA <- getSeq(rCRSeq, anno)
-      refDNA <- anno["MT-ND6"]$refDNA
-      refSeq <- as.character(unlist(unname(extractAt(anno["MT-ND6"]$refDNA, subir))))
-      
-      show(refSeq)
-      show(ref(query[i]))
-      
-      
-      query[i]$localStart <- query[i]$localStart + 54
-      query[i]$localEnd <- query[i]$localEnd + 54
-      
-      subir <- IRanges(query[i]$localStart, query[i]$localEnd)
-      refSeq <- as.character(unlist(unname(extractAt(anno["MT-ND6"]$refDNA, subir))))
-      
-      show(refSeq)
-      show(ref(query[i]))
-      
-    }
+    ######################### 
+    #if (genome(query) == "rCRS" && names(anno[subHit]) == "MT-ND6") {
+    #  
+    #  subir <- IRanges(query[i]$localStart, query[i]$localEnd)
+    #  data(rCRSeq, package="MTseeker")
+    #  anno$refDNA <- getSeq(rCRSeq, anno)
+    #  refDNA <- anno["MT-ND6"]$refDNA
+    #  refSeq <- as.character(unlist(unname(extractAt(anno["MT-ND6"]$refDNA, subir))))
+    #  
+    #  show(refSeq)
+    #  show(ref(query[i]))
+    #  
+    #  
+    #  query[i]$localStart <- query[i]$localStart + 54
+    #  query[i]$localEnd <- query[i]$localEnd + 54
+    #  
+    #  subir <- IRanges(query[i]$localStart, query[i]$localEnd)
+    #  refSeq <- as.character(unlist(unname(extractAt(anno["MT-ND6"]$refDNA, subir))))
+    #  
+    #  show(refSeq)
+    #  show(ref(query[i]))
+    #  
+    #}
+    #########################
     
     # Local codon starts and ends
     # Taking a conservative approach

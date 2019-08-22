@@ -8,7 +8,7 @@
 \usage{
 MTcoverage(x, ...)
 
-plotMTCoverage(x, ...)
+plotMTCoverage(x, ref = c("rCRS", "NC_005089"), ...)
 
 plotStrandedMTCoverage(x, ...)
 }
@@ -16,6 +16,10 @@ plotStrandedMTCoverage(x, ...)
 \item{x}{an MAlignments or MVRanges}
 
 \item{...}{other arguments to pass to GenomicAlignments::coverage()}
+
+\item{ref}{string denoting reference sequence to use}
+
+\item{x}{an MAlignments or MVRanges}
 }
 \value{
 an RleList (or, invisibly for plot functions, a result list)

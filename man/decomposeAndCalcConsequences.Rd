@@ -5,7 +5,7 @@
 \title{Decompose and annotate AA changes in MT variants}
 \usage{
 decomposeAndCalcConsequences(mvr, AAchanges = TRUE, parallel = FALSE,
-  ...)
+  cores = 1, ...)
 }
 \arguments{
 \item{mvr}{An MVRangesList or MVRanges object}

@@ -44,6 +44,6 @@ scanMT <- function(bam, chrM="(rCRS|chrM|MT)", ...) {
   mtFlags <- scanBamFlag(isUnmappedQuery=FALSE, hasUnmappedMate=FALSE, 
                          isSecondaryAlignment=FALSE, isDuplicate=FALSE, 
                          isNotPassingQualityControls=FALSE) 
-  return(ScanBamParam(flag=mtFlags, which=mtWhich, ...)) 
+  return(ScanBamParam(flag=mtFlags, which=mtWhich, what="strand", ...)) 
 
 }

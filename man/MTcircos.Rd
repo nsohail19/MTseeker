@@ -4,9 +4,9 @@
 \alias{MTcircos}
 \title{plot a canonical human (or, in principle, any) mitochondrial genome}
 \usage{
-MTcircos(variants = NULL, outside = NULL, inside = NULL,
-  outcol = NULL, incol = NULL, anno = NULL, how = c("matrix",
-  "VAF"), ...)
+MTcircos(variants = NULL, AA = FALSE, outside = NULL,
+  inside = NULL, outcol = NULL, incol = NULL, anno = NULL,
+  how = c("matrix", "AA"), ...)
 }
 \arguments{
 \item{variants}{optional MVRanges or MVRangesList to split by strand & plot}
@@ -32,9 +32,6 @@ invisibly, a list: `anno` (data.frame) + `pfun` (panel.fun)
 The default font sizes, orientations, etc. are optimized for a "cold" start;
 if you want to fiddle with the details, crack open the code and modify it...
 or alternatively, add sectors/dendrograms inside of this "framed" version.
-}
-\details{
-FIXME: add variant type coloration (del=blue, SNV=black, ins=red)
 }
 \examples{
 library(MTseekerData)

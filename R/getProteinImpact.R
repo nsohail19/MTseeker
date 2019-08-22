@@ -16,6 +16,12 @@
 
 getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
 
+  if (genome(mvr) != "rCRS") {
+    message("getProteinImpact only works with humans, with rCRS reference genomes")
+    message("Run decomposeAndCalcConsequences instead")
+    stop()
+  }
+  
   # Set the number of cores if running in parallel
   if (parallel) options(mc.cores = cores)
   if (parallel & cores == 1) options(mc.cores = detectCores()/2)
@@ -82,7 +88,6 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
         
         if (mitOut$Ref[index] != ref(mvr[i])) {
           message("Reference disparity between APOGEE and pileup")
-          browser()
         }
         
         out <- mitOut[index,]
