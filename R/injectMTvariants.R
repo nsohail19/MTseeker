@@ -56,13 +56,14 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
   gr$varSeq <- gr$refSeq 
   gr$refAA <- suppressWarnings(translate(gr$refSeq, MT_CODE))
   gr$varAA <- gr$refAA
+  
   gr$consequences <- NA_character_
-  gr$typeMut <- NA_character_
+  #gr$typeMut <- NA_character_
   gr$overlapGene <- NA_character_
   
   
   # Determine the type of mutation
-  submvr$typeMut <- NA_character_
+  #submvr$typeMut <- NA_character_
   
   # Iterate through all of the affected genes
   for (i in 1:length(submvr)) {
@@ -73,9 +74,13 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
     # Range for the variant
     subir <- IRanges(submvr[i]$localStart, submvr[i]$localEnd)
     refSeq <- as.character(unlist(unname(extractAt(gr[g]$refSeq, subir))))
+    
+    # These sequences must be the same
+    # Both are based off of the reference sequence
     if (refSeq != ref(submvr[i])) {
       if (g == "MT-ND6" && genome(submvr) == "rCRS") {
-        message("It is difficult to pinpoint MT-ND6 variants start locations, skipping . . .")
+        gr[g]$consequences <- ""
+        message("It is difficult to pinpoint an MT-ND6 variant start location, skipping . . .")
         next
       }
       else message("Injecting variant incorrectly")
@@ -99,49 +104,8 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
     altd <- extractAt(gr[g]$varAA, IRanges(submvr[i]$startCodon, submvr[i]$endCodon))
     gr[g]$consequences <- .flattenConsequences(orig, altd, submvr[i]$startCodon)
     
-    # Determine the overaching consequences (type of mutation)
-    # SNP
-    if (grepl(">", names(submvr[i]))) {
-      if (gr[g]$consequences == "") submvr[i]$typeMut <- "synonymous"
-      else if ("*" %in% unlist(altd)) submvr[i]$typeMut <- "nonsense"
-      else submvr[i]$typeMut <- "missense"
-    }
-    
-    # Insertions
-    else if (grepl("ins", names(submvr[i]))) {
-      if ( (nchar(alt(submvr[i])) - 1)  %% 3 == 0 ) {
-        submvr[i]$typeMut <- "insertion"
-        orig <- extractAt(gr[g]$refAA, IRanges(submvr[i]$startCodon, submvr[i]$startCodon))
-      }
-      else submvr[i]$typeMut <- "frameshift"
-    }
-    
-    # Deletions
-    else {
-      if ( (nchar(ref(submvr[i])) - 1) %% 3 == 0) {
-        submvr[i]$typeMut <- "deletion"
-        altd <- extractAt(gr[g]$varAA, IRanges(submvr[i]$startCodon, submvr[i]$startCodon))
-      } 
-      else submvr[i]$typeMut <- "frameshift"
-      
-    }
-    
-    # If there is a frameshift mutation
-    # Return the rest of the AA sequence as the consequence
-    if (submvr[i]$typeMut == "frameshift") {
-      
-      # Want to return the rest of the sequence that has come super wonky
-      orig <- extractAt(gr[g]$refAA, IRanges(submvr[i]$startCodon, width(gr[g]$refAA)))
-      altd <- extractAt(gr[g]$varAA, IRanges(submvr[i]$startCodon, width(gr[g]$varAA)))
-      gr[g]$consequences <- .flattenConsequences(orig, altd, submvr[i]$startCodon)
-    }
-    
-    # Store the information
-    gr[g]$typeMut <- submvr[i]$typeMut
-    if (!is.na(submvr[i]$overlapGene)) gr[g]$overlapGene <- submvr[i]$overlapGene
-    
-    
-    if (refSeq != ref(submvr[i])) .compCheck(gr, g, submvr[i])
+    gr[g]$overlapGene <- submvr[i]$overlapGene
+    #if (refSeq != ref(submvr[i])) .compCheck(gr, g, submvr[i])
     # San check :)
     #if (!is.na(submvr[i]$overlapGene)) {
     #  show(names(submvr[i]))
@@ -199,4 +163,49 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
   print("AA sequences")
   comp <- pairwiseAlignment(refAA, varAA)
   show(comp)
+}
+
+# May become obsolete with getProteinImpact function
+.typeOfMutation <- function(submvr) {
+  
+  # Determine the overaching consequences (type of mutation)
+  # SNP
+  if (grepl(">", names(submvr[i]))) {
+    if (gr[g]$consequences == "") submvr[i]$typeMut <- "synonymous"
+    else if ("*" %in% unlist(altd)) submvr[i]$typeMut <- "nonsense"
+    else submvr[i]$typeMut <- "missense"
+  }
+  
+  # Insertions
+  else if (grepl("ins", names(submvr[i]))) {
+    if ( (nchar(alt(submvr[i])) - 1)  %% 3 == 0 ) {
+      submvr[i]$typeMut <- "insertion"
+      orig <- extractAt(gr[g]$refAA, IRanges(submvr[i]$startCodon, submvr[i]$startCodon))
+    }
+    else submvr[i]$typeMut <- "frameshift"
+  }
+  
+  # Deletions
+  else {
+    if ( (nchar(ref(submvr[i])) - 1) %% 3 == 0) {
+      submvr[i]$typeMut <- "deletion"
+      altd <- extractAt(gr[g]$varAA, IRanges(submvr[i]$startCodon, submvr[i]$startCodon))
+    } 
+    else submvr[i]$typeMut <- "frameshift"
+    
+  }
+  
+  # If there is a frameshift mutation
+  # Return the rest of the AA sequence as the consequence
+  if (submvr[i]$typeMut == "frameshift") {
+    
+    # Want to return the rest of the sequence that has come super wonky
+    orig <- extractAt(gr[g]$refAA, IRanges(submvr[i]$startCodon, width(gr[g]$refAA)))
+    altd <- extractAt(gr[g]$varAA, IRanges(submvr[i]$startCodon, width(gr[g]$varAA)))
+    gr[g]$consequences <- .flattenConsequences(orig, altd, submvr[i]$startCodon)
+  }
+  
+  # Store the information
+  gr[g]$typeMut <- submvr[i]$typeMut
+  
 }

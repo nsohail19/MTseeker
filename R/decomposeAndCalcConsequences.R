@@ -66,7 +66,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
   
   #add empty column for consequences
   mcols(mvr)$AAchange <- NA
-  mcols(mvr)$typeMut <- NA
+  #mcols(mvr)$typeMut <- NA
   
   mcols(mvr)$impacted.gene <- NA
   mcols(mvr)$overlapGene <- NA
@@ -78,8 +78,8 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
   
   if (!isDisjoint(mvr)) {
     
-    message("Found non-disjoint ranges in ", sampleNames(mvr)@values)
-    message("Processing consequences...")
+    #message("Found non-disjoint ranges in ", sampleNames(mvr)@values)
+    #message("Processing consequences...")
     
     if (AAchanges) {
 
@@ -93,7 +93,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
           
           mcols(newMvr)$AAchange <- mcols(con)$consequences[2]
           if (mcols(newMvr)$AAchange == "") mcols(newMvr)$AAchange <- NA_character_
-          mcols(newMvr)$typeMut <- mcols(con)$typeMut[2]
+          #mcols(newMvr)$typeMut <- mcols(con)$typeMut[2]
           
           mcols(newMvr)$impacted.gene <- mcols(con)$synonym[2]
           mcols(newMvr)$overlapGene <- mcols(con)$overlapGene[2]
@@ -103,8 +103,8 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
         } else {
           
           mcols(mvr)$AAchange[r] <- mcols(con)$consequences
-          if (mcols(mvr)$AAchange[r] == "") mcols(mvr)$AAchange[r] <- NA_character_ 
-          mcols(mvr)$typeMut[r] <- mcols(con)$typeMut
+          if (mcols(mvr)$AAchange[r] == "") mcols(mvr)$AAchange[r] <- NA_character_
+          #mcols(mvr)$typeMut[r] <- mcols(con)$typeMut
           
           mcols(mvr)$impacted.gene[r] <- mcols(con)$synonym
           mcols(mvr)$overlapGene[r] <- mcols(con)$overlapGene
@@ -117,7 +117,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
   }
   
   else {
-    message("Processing consequences for ", sampleNames(mvr)@values)
+    #message("Processing consequences for ", sampleNames(mvr)@values)
     if (AAchanges) {
       
       for (r in 1:length(mvr)) {
@@ -128,7 +128,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
           newMvr <- mvr[r]
           
           mcols(newMvr)$AAchange <- mcols(con)$consequences[2]
-          mcols(newMvr)$typeMut <- mcols(con)$typeMut[2]
+          #mcols(newMvr)$typeMut <- mcols(con)$typeMut[2]
           
           mcols(newMvr)$impacted.gene <- mcols(con)$synonym[2]
           mcols(newMvr)$overlapGene <- mcols(con)$overlapGene[2]
@@ -138,7 +138,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
         } else {
           
           mcols(mvr)$AAchange[r] <- mcols(con)$consequences
-          mcols(mvr)$typeMut[r] <- mcols(con)$typeMut
+          #mcols(mvr)$typeMut[r] <- mcols(con)$typeMut
           
           mcols(mvr)$impacted.gene[r] <- mcols(con)$synonym
           mcols(mvr)$overlapGene[r] <- mcols(con)$overlapGene

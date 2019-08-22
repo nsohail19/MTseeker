@@ -105,11 +105,29 @@ locateMTvariants <- function(query) {
     query[i]$localStart <- start(query[i]) - start(anno[subHit]) + 1
     query[i]$localEnd <- end(query[i]) - start(anno[subHit]) + 1
     
-    #if (genome(query) == "rCRS" && names(anno[subHit]) == "MT-ND6") {
-    #  
-    #  query[i]$localStart <- start(query[i]) - start(anno[subHit]) + 1 - 2
-    #  query[i]$localEnd <- end(query[i]) - start(anno[subHit]) + 1 - 2
-    #}
+    if (genome(query) == "rCRS" && names(anno[subHit]) == "MT-ND6") {
+      
+      subir <- IRanges(query[i]$localStart, query[i]$localEnd)
+      data(rCRSeq, package="MTseeker")
+      anno$refDNA <- getSeq(rCRSeq, anno)
+      refDNA <- anno["MT-ND6"]$refDNA
+      refSeq <- as.character(unlist(unname(extractAt(anno["MT-ND6"]$refDNA, subir))))
+      
+      show(refSeq)
+      show(ref(query[i]))
+      
+      browser()
+      
+      query[i]$localStart <- query[i]$localStart + 54
+      query[i]$localEnd <- query[i]$localEnd + 54
+      
+      subir <- IRanges(query[i]$localStart, query[i]$localEnd)
+      refSeq <- as.character(unlist(unname(extractAt(anno["MT-ND6"]$refDNA, subir))))
+      
+      show(refSeq)
+      show(ref(query[i]))
+      
+    }
     
     # Local codon starts and ends
     # Taking a conservative approach
