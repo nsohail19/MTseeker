@@ -165,7 +165,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
   if (is.null(gr)) gr <- genes(mvr)
   stopifnot(unique(genome(gr)) == "rCRS")
 
-  mvr <- MVRanges(subsetByOverlaps(mvr, gr, type="within"))
+  mvr <- MVRanges(subsetByOverlaps(mvr, gr, type="within"), coverage = genomeCoverage(mvr))
   
   # subset the variants to those that overlap the target GRanges and are canon
   if (length(mvr)) {
