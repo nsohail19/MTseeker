@@ -31,17 +31,31 @@
 #' title("Renal oncocytomas and normal kidney samples")
 #' 
 #' @export 
-MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=NULL, 
+MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL, 
                      incol=NULL, anno=NULL, how=c("matrix", "AA"), ...) {
   circos.clear() 
-
+  
   if (length(how) > 1) {
     how <- "matrix"
   }
+  
+  if (how == "AA") {
+    
+    if (is(variants, "MVRanges")) {
+      if (!("typeMut" %in% names(mcols(variants)))) {
+        message("Must run getProteinImpact() before plottting AA changes")
+        stop()
+      }
+    }
+    
 
-  if (how == "AA" && !("typeMut" %in% names(mcols(variants[[1]])))) {
-    message("Must run decomposeAndCalcConsequences() before plottting AA changes")
-    stop()
+    else if (is(variants, "MVRangesList")) {
+      if(!"typeMut" %in% names(mcols(variants[[1]]))) {
+        message("Must run getProteinImpact() before plottting AA changes")
+        stop()
+      }
+    }
+    
   }
   
   anno <- initMTcircos(variants)
@@ -57,26 +71,24 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   } 
 
   # Outside track
-  if (!is.null(outside) && length(outside) != 0) {
+  if (!isEmpty(outside)) {
     
     # Color code according to AA changes
     if (how == "AA") {
-      message("Working on it, AA")
+      bed1 <- .AAmakeColoredMatrix(outside)
+      vafBed1 <- .vafMatrix(bed1, outside, how)
     }
     
     else {
       # Color coding for the variants
       # del=blue, SNV=black, ins=red
       bed1 <- .makeColoredMatrix(outside)
-      vafBed1 <- .vafMatrix(bed1, outside)
-
-      #col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
-      circos.genomicHeatmap(bed1, outcol, line_col=.colorCode(bed1$chr), col = vafBed1[,4:ncol(vafBed1)],
-                            track.margin=c(0,0), side="outside", border=NA,
-                            line_lwd=2) 
-      
+      vafBed1 <- .vafMatrix(bed1, outside, how)
     }
     
+    circos.genomicHeatmap(bed1, outcol, line_col=.colorCode(bed1$chr), col = vafBed1,
+                          track.margin=c(0,0), side="outside", border=NA,
+                          line_lwd=2) 
   }
   else {
     circos.track(track.height=0.15, ylim=c(0,1), bg.border=NA)
@@ -84,27 +96,25 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   
   # main track, gene names and such
   res <- genesMTcircos(variants, anno, legends=T)
-  
+
   # Inside track
-  if (!is.null(inside) && length(inside) != 0) {
+  if (!isEmpty(inside)) {
     
     # Color code according to AA changes
     if (how == "AA") {
-      message("Working on it, AA")
+      bed2 <- .AAmakeColoredMatrix(inside)
+      vafBed2 <- .vafMatrix(bed2, inside, how)
     }
     
     else {
       # del=blue, SNV=black, ins=red
-
       bed2 <- .makeColoredMatrix(inside)
-      vafBed2 <- .vafMatrix(bed2, inside)
-
-      #col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
-      circos.genomicHeatmap(bed2, outcol, line_col=.colorCode(bed2$chr), col = vafBed2[,4:ncol(vafBed2)],
-                            track.margin=c(0,0), side="inside", border=NA,
-                            line_lwd=2) 
+      vafBed2 <- .vafMatrix(bed2, inside, how)
     }
     
+    circos.genomicHeatmap(bed2, outcol, line_col=.colorCode(bed2$chr), col = vafBed2,
+                          track.margin=c(0,0), side="inside", border=NA,
+                          line_lwd=2) 
   }
   else {
     circos.track(track.height=0.15, ylim=c(0,1), bg.border=NA)
@@ -112,13 +122,11 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   
   # Color code according to AA changes
   if (how == "AA") {
-    message("Working on it, AA")
+    legend("bottomleft", title="Type of Variant", ncol=2,
+           legend=c("Missense", "Nonsense", "Synonymous", "Insertion", "Deletion", "Frameshift"), col=viridis(6), pch=15, cex=0.8)
+    
   }
-  
-  # Transparency according to VAF
-  else if (how == "VAF") {
-    message("Working on it, VAF")
-  }
+
   
   else {
     legend("bottomleft", title="Type of Variant",
@@ -129,53 +137,6 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   invisible(res)
   
 }
-
-
-# helper fn
-.makeBed <- function(x) {
-  bed <- switch(class(x),
-                "MVRanges"=.mvrToBed(x),
-                "MVRangesList"=.mvrlToBed(x),
-                "GRanges"=.grToBed(x))
-  names(bed)[1] <- "chr"
-  return(bed)
-}
-
-# helper fn
-.mvrToBed <- function(mvr) { 
-  
-  message("This will take a moment")
-
-  # Iterate through each variant and call locateVariant
-  newMvr <- locateMTvariants(mvr[1])
-  for (i in 2:length(mvr)) {
-    newVar <- locateVariants(mvr[i])
-    newMvr <- append(newMvr, newVar)
-  }
-  
-  bed <- as.data.frame(newMvr)[, c("gene", "start", "end")]
-  
-  bed$value <- mvr$VAF
-  bed <- subset(bed, !is.na(bed[,1]))
-  return(bed)
-}
-
-# helper fn
-.mvrlToBed <- function(mvrl) { 
-
-  gr <- granges(mvrl, filterLowQual=FALSE)
-  bed <- as.data.frame(gr)
-  bed <- bed[, c(6, 2, 3, 8:(ncol(bed)))]
-  return(bed)
-}
-
-# helper fn
-.grToBed <- function(gr) { 
-  bed <- as.data.frame(gr)[, c("gene", "start", "end")]
-  bed$value <- 1
-  return(bed)
-}
-
 
 .makeColoredMatrix <- function(mvr) {
 
@@ -202,48 +163,60 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
 
   # Figure out which of the variants in a sample is SNV, ins, del
   # Assign color according to the unique values set for each type of variant
-  for (i in 1:numSamples) {
+  if (is(mvr, "MVRanges")) {
     
-    # MVRangesList
-    if (! (numSamples == 1) ) {
+    ins <- grep("ins", names(mvr))
+    del <- grep("del", names(mvr))
+    snv <- grep(">", names(mvr))
+
+    typeDF[,4][ins] <- 1
+    typeDF[,4][snv] <- 2
+    typeDF[,4][del] <- 3
+
+  }
+ 
+  else {
+    for (i in 1:numSamples) {
+      
+      #if(length(mvr[[i]]) == 0) next
+      
       rowInd <- which(allNames %in% names(mvr[[i]]))
       rowOverlapNames <- allNames[rowInd]
-    }
-    # MVRanges
-    else {
-      rowOverlapNames <- allNames
-    }
+      
+      snvs <- rowOverlapNames[grep(">", rowOverlapNames)]
+      ins <- rowOverlapNames[grep("ins", rowOverlapNames)]
+      dels <- rowOverlapNames[grep("del", rowOverlapNames)]
+      
+      if (length(ins) > 0) typeDF[ins,][,i + 3] <- 1
+      if (length(snvs) > 0) typeDF[snvs,][,i + 3] <- 2
+      if (length(dels) > 0) typeDF[dels,][,i + 3] <- 3
+      # del=blue, SNV=black, ins=red
 
-    snvs <- rowOverlapNames[grep(">", rowOverlapNames)]
-    ins <- rowOverlapNames[grep("ins", rowOverlapNames)]
-    dels <- rowOverlapNames[grep("del", rowOverlapNames)]
-    
-    # del=blue, SNV=black, ins=red
-    if (length(ins)) {
-      typeDF[ins,][,i + 3] <- 1
     }
-    
-    if (length(snvs)) {
-      typeDF[snvs,][,i + 3] <- 2
-    }
-    
-    if (length(dels)) {
-      typeDF[dels,][,i + 3] <- 3
-    } 
   }
-
-  # Get the start and end position for each variants
-  for (j in 1:numSamples) {
-
-    hits <- which(typeDF[,j + 3] != 0)
-    varNames <- allNames[hits]
-    
-    vars <- mvr[[j]][varNames]
-    varStart <- start(vars)
-    varEnd <- end(vars)
-    
-    typeDF$start[hits] <- varStart
-    typeDF$end[hits] <- varEnd
+  
+  # Get the start and end positions
+  if (is(mvr, "MVRanges")) {
+    typeDF$start <- start(mvr)
+    typeDF$end <- end(mvr)
+  }
+  
+  else {
+    # Get the start and end position for each variants
+    for (j in 1:numSamples) {
+      
+      #if(length(mvr[[j]]) == 0) next
+      
+      hits <- which(typeDF[,j + 3] != 0)
+      varNames <- allNames[hits]
+      
+      vars <- mvr[[j]][varNames]
+      varStart <- start(vars)
+      varEnd <- end(vars)
+      
+      typeDF$start[hits] <- varStart
+      typeDF$end[hits] <- varEnd
+    }
   }
 
   # Get the names of the genes each variant is found in
@@ -259,48 +232,230 @@ MTcircos <- function(variants=NULL, AA=FALSE, outside=NULL, inside=NULL, outcol=
   return(typeDF)
 }
 
-.vafMatrix <- function(bed, mvr) {
+.vafMatrix <- function(bed, mvr, how) {
 
   vafs <- bed
   vafs[,4:ncol(vafs)] <- 0
 
+
+  # Get the VAF for each nonzero element of the matrix
+  if (is(mvr, "MVRanges")) {
+    vafs[,4] <- mvr$VAF
+  }
   # Get the VAF for each variants
-  for (j in 1:(ncol(bed) - 3)) {
-    
-    hits <- which(bed[,j + 3] != 0)
-    varNames <- row.names(bed)[hits]
-    
-    vars <- mvr[[j]][varNames]
-    varVAF <- vars$VAF
-    
-    vafs[,j + 3][hits] <- varVAF
+  else {
+    for (j in 1:(ncol(bed) - 3)) {
+      
+      hits <- which(bed[,j + 3] != 0)
+      varNames <- row.names(bed)[hits]
+      
+      vars <- mvr[[j]][varNames]
+      varVAF <- vars$VAF
+      
+      vafs[,j + 3][hits] <- varVAF
+    }
   }
 
-  # Transparancy goes from a scale of 0-255
-  #copy[,4:ncol(vafs)] * 255
-  #return(vafs)
-  
-  #vafBed1 <- .vafMatrix(typeDF, mvr)
-  #adjustcolor(typeDF[,4][1], alpha.f=vafBed1[,4][1])
 
   # Nonzero elements
-  
   nonzero <- which(bed[,4:ncol(bed)] !=0, arr.ind=T)
-  for (k in 1:nrow(nonzero)) {
+  
+  # Color according to AA change
+  if (how == "AA") {
     
-    # 1 is the row
-    # 2 is the column
-    rows <- nonzero[k,][1]
-    cols <- nonzero[k,][2]
+    cols <- viridis(6)
     
-    #col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
-    if (bed[rows,][cols + 3] == 1) bed[rows,][cols + 3] <- "red"
-    else if (bed[rows,][cols + 3] == 2) bed[rows,][cols + 3] <- "black"
-    else if (bed[rows,][cols + 3] == 3) bed[rows,][cols + 3] <- "blue"
+    if (is(mvr, "MVRanges")) {
+      
+      bed[,4][which(bed[,4] == 1)] <- cols[1]
+      bed[,4][which(bed[,4] == 2)] <- cols[2]
+      bed[,4][which(bed[,4] == 3)] <- cols[3]
+      bed[,4][which(bed[,4] == 4)] <- cols[4]
+      bed[,4][which(bed[,4] == 5)] <- cols[5]
+      bed[,4][which(bed[,4] == 6)] <- cols[6]
+      
+      for (i in 1:length(mvr)) {
+        bed[,4][i] <- adjustcolor(col = bed[,4][i],alpha.f = vafs[,4][i])
+      }
+    }
+    
+    else {
 
-    bed[rows,][cols + 3] <- adjustcolor(col = bed[rows,][cols + 3], 
-                                        alpha.f = vafs[rows,][cols + 3])
+      for (i in 1:(ncol(bed) - 3)) {
+        
+        bed[,i + 3][which(bed[,i + 3] == 1)] <- cols[1]
+        bed[,i + 3][which(bed[,i + 3] == 2)] <- cols[2]
+        bed[,i + 3][which(bed[,i + 3] == 3)] <- cols[3]
+        bed[,i + 3][which(bed[,i + 3] == 4)] <- cols[4]
+        bed[,i + 3][which(bed[,i + 3] == 5)] <- cols[5]
+        bed[,i + 3][which(bed[,i + 3] == 6)] <- cols[6]
+        
+      }
+      
+      # Add transparency
+      for (k in 1:nrow(nonzero)) {
+        
+        # 1 is the row
+        # 2 is the column
+        rows <- nonzero[k,][1]
+        cols <- nonzero[k,][2]
+        
+        bed[rows,][cols + 3] <- adjustcolor(col = bed[rows,][cols + 3], 
+                                            alpha.f = vafs[rows,][cols + 3])
+      }
+      
+    }
+    
   }
-   
+  
+  # Only color code snvs, ins, dels
+  else {
+    
+    if (is(mvr, "MVRanges")) {
+
+      bed[,4][which(bed[,4] == 1)] <- "red"
+      bed[,4][which(bed[,4] == 2)] <- "black"
+      bed[,4][which(bed[,4] == 3)] <- "blue"
+      
+      for (i in 1:length(mvr)) {
+        bed[,4][i] <- adjustcolor(col = bed[,4][i],alpha.f = vafs[,4][i])
+      }
+    }
+    
+    else {
+      for (k in 1:nrow(nonzero)) {
+        
+        # 1 is the row
+        # 2 is the column
+        rows <- nonzero[k,][1]
+        cols <- nonzero[k,][2]
+        
+        #col_fun = colorRamp2(c(0, 1, 2, 3), c("white", "red", "black", "blue"))
+        if (bed[rows,][cols + 3] == 1) bed[rows,][cols + 3] <- "red"
+        else if (bed[rows,][cols + 3] == 2) bed[rows,][cols + 3] <- "black"
+        else if (bed[rows,][cols + 3] == 3) bed[rows,][cols + 3] <- "blue"
+        
+        bed[rows,][cols + 3] <- adjustcolor(col = bed[rows,][cols + 3], 
+                                            alpha.f = vafs[rows,][cols + 3])
+      }
+    }
+
+  }
+
+  bed <- bed[,4:ncol(bed)]
+  if (is(mvr, "MVRanges")) bed <- as.matrix(bed)
   return(bed)
+}
+
+.AAmakeColoredMatrix <- function(mvr) {
+  
+  browser()
+  
+  # Making a colored matrix
+  if (is(mvr, "MVRangesList")) {
+    allNames <- lapply(mvr, names)
+    allNames <- unique(unlist(unname(allNames)))
+    numSamples <- length(mvr)
+  } else {
+    allNames <- unique(names(mvr))
+    numSamples <- 1
+  }
+  
+  rowNam <- c("chr", "start", "end")
+  
+  if (numSamples == 1) rowNam <- append(rowNam, unique(as.character(sampleNames(mvr))))
+  else rowNam <- append(rowNam, names(mvr))
+  
+  m <- matrix(0, ncol = length(rowNam), nrow = length(allNames))
+  typeDF <- data.frame(m)
+  
+  names(typeDF) <- rowNam
+  rownames(typeDF) <- allNames
+  
+  
+  # Assign values to the type of mutations
+  # nonsense, synonymous, insertion, deletion, etc.
+  if (is(mvr, "MVRanges")) {
+    
+    missense <- grep("missense", mvr$typeMut)
+    nonsense <- grep("nonsense", mvr$typeMut)
+    synonymous <- grep("synonymous", mvr$typeMut)
+    insertion <- grep("insertion", mvr$typeMut)
+    deletion <- grep("deletion", mvr$typeMut)
+    frameshift <- grep("frameshift", mvr$typeMut)
+    
+    typeDF[,4][missense] <- 1
+    typeDF[,4][nonsense] <- 2
+    typeDF[,4][synonymous] <- 3
+    typeDF[,4][insertion] <- 4
+    typeDF[,4][deletion] <- 5
+    typeDF[,4][frameshift] <- 6
+    
+  }
+  
+  else {
+    
+    # Figure out which of the variants in a sample is which type of variants
+    # Assign color according to the unique values set for each type of variant
+    for (i in 1:numSamples) {
+      show(mvr[[i]])
+      browser()
+      rowInd <- which(allNames %in% names(mvr[[i]]))
+      rowOverlapNames <- allNames[rowInd]
+
+      missense <- rowInd[grep("missense", mvr[[i]][rowOverlapNames,]$typeMut)]
+      nonsense <- rowInd[grep("nonsense", mvr[[i]][rowOverlapNames,]$typeMut)]
+      synonymous <- rowInd[grep("synonymous", mvr[[i]][rowOverlapNames,]$typeMut)]
+      insertion <- rowInd[grep("insertion", mvr[[i]][rowOverlapNames,]$typeMut)]
+      deletion <- rowInd[grep("deletion", mvr[[i]][rowOverlapNames,]$typeMut)]
+      frameshift <- rowInd[grep("frameshift", mvr[[i]][rowOverlapNames,]$typeMut)]
+      
+      typeDF[,i+3][missense] <- 1
+      typeDF[,i+3][nonsense] <- 2
+      typeDF[,i+3][synonymous] <- 3
+      typeDF[,i+3][insertion] <- 4
+      typeDF[,i+3][deletion] <- 5
+      typeDF[,i+3][frameshift] <- 6
+    
+    }
+  }
+  
+  # Get the start and end positions for each variant
+  if (is(mvr, "MVRanges")) {
+
+    typeDF$start <- start(mvr)
+    typeDF$end <- end(mvr)
+    
+  }
+  
+  else {
+    
+    # Get the start and end position for each variants
+    for (j in 1:numSamples) {
+      
+      hits <- which(typeDF[,j + 3] != 0)
+      varNames <- allNames[hits]
+      
+      vars <- mvr[[j]][varNames]
+      varStart <- start(vars)
+      varEnd <- end(vars)
+      
+      typeDF$start[hits] <- varStart
+      typeDF$end[hits] <- varEnd
+    }
+    
+  }
+  
+  
+  # Get the names of the genes each variant is found in
+  anno <- suppressMessages(getAnnotations(mvr))
+  ov <- findOverlaps(IRanges(typeDF$start, typeDF$end), ranges(anno))
+  
+  # If there are overlapping genes
+  # Only list the first gene it overlaps in
+  firstOv <- ov[match(unique(queryHits(ov)), queryHits(ov)), ]
+  
+  typeDF$chr <- names(anno)[subjectHits(firstOv)]
+  
+  return(typeDF)
 }
