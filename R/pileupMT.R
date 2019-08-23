@@ -109,11 +109,9 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   covg <- round(numReads * readsWidth / width(refSeqDNA))
   if (is.na(covg)) covg <- 0
   
-  #data("anno_rCRS")
-  #lightStrand <- subset(mtAnno, strand == "-")
-  
   # will need to handle '-' and '+' separately 
   indels <- subset(pu, nucleotide %in% c('-', '+'))
+  
   if (nrow(indels) > 0) {
     # for obtaining the supporting reads and CIGARs from the BAM: 
     indels$start <- indels$pos
@@ -195,37 +193,40 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   
   # If there exists SNPs, turn the pu into MVRanges
   if (nrow(pu) != 0) {
+  
+    strandMvr <- .puToMvr(pu, refSeqDNA, ref, bam, covg)
     
-    pu$altDepth <- ifelse(is.na(pu$alt), NA_integer_, pu$count) 
-    pu$refDepth <- pu$totalDepth - .byPos(pu, "altDepth")
-    pu$isAlt <- !is.na(pu$alt)
-    pu$alleles <- .byPos(pu, "isAlt") + 1 
-    columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth")
-    gr <- keepSeqlevels(.puToGR(subset(pu, isAlt|alleles==1)[,columns]),
-                        unique(pu$seqnames))
+    # Because strandedness (heavy and light strands) matters sometimes
+    # Some of the variants appear twice, despite having the same consequences
+    # All I wants to do is add together their alt depths and set all the strands to +
+    # They are all represented as through they are on the + strand anyways
+    heavyMvr <- strandMvr[which(strand(strandMvr) == "+")]
+    lightMvr <- strandMvr[which(strand(strandMvr) == "*")]
     
-    # seqnames for mouse genome is "MT" 
-    seqinfo(gr) <- Seqinfo(levels(seqnames(gr)), width(refSeqDNA), 
-                           isCircular=TRUE, genome=ref)
-    vr <- makeVRangesFromGRanges(.puToGR(subset(pu, isAlt|alleles==1)[,columns]))
-    vr <- keepSeqlevels(vr, levels(seqnames(gr))) 
-    seqinfo(vr) <- seqinfo(gr)
-    #mvr <- MVRanges(vr, coverage=median(rowsum(pu$count, pu$pos)))
-    mvr <- MVRanges(vr, coverage=covg)
-    sampleNames(mvr) <- base::sub(paste0(".", ref), "", 
-                                  base::sub(".bam", "", 
-                                            basename(bam)))
-    names(mvr)[which(mvr$ref != mvr$alt)] <- MTHGVS(subset(mvr, ref != alt)) 
-    altDepth(mvr)[is.na(altDepth(mvr))] <- 0
+    matchedLight <- match(names(lightMvr), names(heavyMvr))
     
-    mvr$VAF <- altDepth(mvr)/totalDepth(mvr)
-    metadata(mvr)$refseq <- refSeqDNA
+    # These are light stranded variants that do not have duplicated heavy stranded variants
+    # However they are still representing what the variant would look like on the heavy strand
+    uniqueLight <- which(is.na(matchedLight))
+    uniqueLightMvr <- lightMvr[uniqueLight]
+    
+    # These are overlapping light strands
+    matchedLightIndex <- which(!is.na(matchedLight))
+    matchedLightMvr <- lightMvr[matchedLightIndex]
+    
+    # Only have to add the altDepths since the refDepths will be the same for 'duplicated' variants
+    altDepth(heavyMvr[matchedLight[matchedLightIndex]]) <- altDepth(heavyMvr[matchedLight[matchedLightIndex]]) + altDepth(matchedLightMvr)
+    
+    # Merge together the light and heavy strand variants
+    mvr <- MVRanges(c(heavyMvr, uniqueLightMvr), coverage=covg)
+    
+    # Recalculate the totalDepth
+    totalDepth(mvr) <- altDepth(mvr) + refDepth(mvr)
+    mvr <- sort(mvr, ignore.strand=T)
     
     metadata(mvr)$bam <- basename(bam)
     metadata(mvr)$sbp <- sbp
     metadata(mvr)$pup <- pup
-    mvr$bam <- basename(bam)
-    genome(mvr) <- ref
     
     # Determine if these are potentially a part of haplogroup regions
     data(haplomask_whitelist)
@@ -238,7 +239,6 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
       }
     }
 
-    
     names(mvr) <- MTHGVS(mvr)
   }
 
@@ -261,7 +261,10 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     mvr <- sort(mvr, ignore.strand=T)
     names(mvr) <- MTHGVS(mvr)
   }
-
+  
+  metadata(mvr)$bam <- basename(bam)
+  metadata(mvr)$sbp <- sbp
+  metadata(mvr)$pup <- pup
   metadata(mvr)$coverageRle <- coverage(mvr)
   return(mvr)
 }
@@ -274,7 +277,10 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
 # helper fn
 .puToGR <- function(pu) { 
-  makeGRangesFromDataFrame(pu, start.field="pos", end.field="pos", strand="*",
+  #makeGRangesFromDataFrame(pu, start.field="pos", end.field="pos", strand="*",
+  #                         keep.extra.columns=TRUE)
+  
+  makeGRangesFromDataFrame(pu, start.field="pos", end.field="pos",
                            keep.extra.columns=TRUE)
 }
 
@@ -600,9 +606,57 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 }
 
 # helper fn
+# Turn pileup snvs into mvranges
+.puToMvr <- function(pu, refSeqDNA, ref, bam, covg) {
+
+  pu$altDepth <- ifelse(is.na(pu$alt), NA_integer_, pu$count) 
+  pu$refDepth <- pu$totalDepth - .byPos(pu, "altDepth")
+  pu$isAlt <- !is.na(pu$alt)
+  pu$alleles <- .byPos(pu, "isAlt") + 1 
+  #pu$strand <- as.character(pu$strand)
+  
+  columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth", "strand")
+  gr <- keepSeqlevels(.puToGR(subset(pu, isAlt|alleles==1)[,columns]),
+                      unique(pu$seqnames))
+
+  # seqnames for mouse genome is "MT" 
+  seqinfo(gr) <- Seqinfo(levels(seqnames(gr)), width(refSeqDNA), 
+                         isCircular=TRUE, genome=ref)
+  
+  vr <- makeVRangesFromGRanges(gr)
+  
+  # Keeping all light strands as * bc MVRanges blows up otherwise
+  # VRanges are not allowed to have light strand variants apparently
+  strand(vr) <- as.factor(strand(gr))
+  strand(vr[which(strand(vr) == "-")]) <- "*"
+  
+  vr <- keepSeqlevels(vr, levels(seqnames(gr))) 
+  seqinfo(vr) <- seqinfo(gr)
+
+  mvr <- MVRanges(vr, coverage=covg)
+  #strand(mvr) <- rle(as.factor(strand(gr)))
+  
+  sampleNames(mvr) <- base::sub(paste0(".", ref), "", 
+                                base::sub(".bam", "", 
+                                          basename(bam)))
+  names(mvr)[which(mvr$ref != mvr$alt)] <- MTHGVS(subset(mvr, ref != alt)) 
+  altDepth(mvr)[is.na(altDepth(mvr))] <- 0
+  
+  mvr$VAF <- altDepth(mvr)/totalDepth(mvr)
+  metadata(mvr)$refseq <- refSeqDNA
+  
+  mvr$bam <- basename(bam)
+  genome(mvr) <- ref
+  
+  names(mvr) <- MTHGVS(mvr)
+  
+  return(mvr)
+}
+
+# helper fn
 # Will make turn the indel information into a MVRanges
 .indelToMVR <- function(indelReads, refSupport, ref, bam, covg) {
-  
+
   # This is mostly copied and pasted from the mvr created at the end of pileup
   indelSupport <- as.data.frame(indelReads)
   
@@ -618,7 +672,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   #pu$alleles <- .byPos(pu, "isAlt") + 1 
 
   # Turn into GRanges
-  columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth", "potentialHaplo")
+  columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth", "potentialHaplo", "strand")
   grIndel <- keepSeqlevels(.puToGR(indelSupport[,columns]), unique(indelSupport$seqnames))
   seqinfo(grIndel) <- Seqinfo(levels(seqnames(grIndel)), width(.getRefSeq(ref)), isCircular=TRUE, genome=ref)
   
@@ -626,6 +680,10 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   vrIndel <- makeVRangesFromGRanges(grIndel)
   vrIndel <- keepSeqlevels(vrIndel, levels(seqnames(grIndel))) 
   seqinfo(vrIndel) <- seqinfo(grIndel)
+  
+  # Need to mess around with strands again
+  strand(vrIndel) <- strand(grIndel)
+  strand(vrIndel[strand(vrIndel) == "-"]) <- "*"
   
   # Turn into MVRanges
   mvrIndel <- MVRanges(vrIndel, coverage = covg)
