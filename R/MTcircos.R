@@ -122,14 +122,14 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   
   # Color code according to AA changes
   if (how == "AA") {
-    legend("bottomleft", title="Type of Variant", ncol=2,
+    legend("topright", title="Type of Variant", ncol=2,
            legend=c("Missense", "Nonsense", "Synonymous", "Insertion", "Deletion", "Frameshift"), col=viridis(6), pch=15, cex=0.8)
     
   }
 
   
   else {
-    legend("bottomleft", title="Type of Variant",
+    legend("topright", title="Type of Variant",
            legend=c("Insertion", "Deletion", "SNV"), col=c("red", "blue", "black"), pch=15, cex=0.8)
   }
  
@@ -291,7 +291,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
         bed[,i + 3][which(bed[,i + 3] == 6)] <- cols[6]
         
       }
-      
+
       # Add transparency
       for (k in 1:nrow(nonzero)) {
         
@@ -349,8 +349,6 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
 
 .AAmakeColoredMatrix <- function(mvr) {
   
-  browser()
-  
   # Making a colored matrix
   if (is(mvr, "MVRangesList")) {
     allNames <- lapply(mvr, names)
@@ -398,8 +396,7 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
     # Figure out which of the variants in a sample is which type of variants
     # Assign color according to the unique values set for each type of variant
     for (i in 1:numSamples) {
-      show(mvr[[i]])
-      browser()
+
       rowInd <- which(allNames %in% names(mvr[[i]]))
       rowOverlapNames <- allNames[rowInd]
 
