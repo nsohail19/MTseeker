@@ -175,7 +175,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   }
   # data(fpFilter_Triska, package="MTseeker") # for when they are... 
   
-  message("Tallying SNPs for: ", sampNames)
+  message("Tallying SNVs for: ", sampNames)
 
   # this may belong in a separate helper function...
   pu <- subset(pu, nucleotide %in% c('A','C','G','T'))
@@ -214,9 +214,13 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     matchedLightIndex <- which(!is.na(matchedLight))
     matchedLightMvr <- lightMvr[matchedLightIndex]
     
+    # Keep track of variants found on both strands for debugging purposes
+    heavyMvr$bothStrands <- FALSE
+    
     # Only have to add the altDepths since the refDepths will be the same for 'duplicated' variants
     altDepth(heavyMvr[matchedLight[matchedLightIndex]]) <- altDepth(heavyMvr[matchedLight[matchedLightIndex]]) + altDepth(matchedLightMvr)
-    
+    heavyMvr[matchedLight[matchedLightIndex]]$bothStrands <- TRUE
+
     # Merge together the light and heavy strand variants
     mvr <- MVRanges(c(heavyMvr, uniqueLightMvr), coverage=covg)
     
@@ -229,14 +233,13 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     metadata(mvr)$pup <- pup
     
     # Determine if these are potentially a part of haplogroup regions
-    data(haplomask_whitelist)
-    mvr$potentialHaplo <- FALSE
-    #haploSnps <- subsetByOverlaps(ranges(haplomask_whitelist[[1]]), IRanges(startPos, endPos))
+    # Only for human genomes
     if (ref == "rCRS") {
-      for (i in 1:nrow(pu)) {
-        haploSnps <- subsetByOverlaps(ranges(haplomask_whitelist[[1]]), IRanges(pu[i,]$pos, pu[i,]$pos))
-        if (length(haploSnps) > 0) mvr[i]$potentialHaplo <- TRUE
-      }
+      data(haplomask_whitelist)
+      mvr$potentialHaplo <- FALSE
+      
+      haploNames <- names(subsetByOverlaps(mvr, haplomask_whitelist[[1]]))
+      mvr[haploNames]$potentialHaplo <- TRUE
     }
 
     names(mvr) <- MTHGVS(mvr)
@@ -696,22 +699,64 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   # Assign names
   names(mvrIndel) <- MTHGVS(mvrIndel) 
 
+  ####################################
+  strandMvr <- mvrIndel
+  
+  # Indels with duplicated variants
+  # Need to consolidate them together
+  dupHeavy <- strandMvr[which(strand(strandMvr) == "+")]
+  dupLight <- strandMvr[which(strand(strandMvr) == "*")]
+  
+  # Now have the correct depth for each variant
+  # Each variant now appears once for each strand
+  uniqueHeavy <- unique(dupHeavy)
+  count <- table(names(dupHeavy))
+  altDepth(uniqueHeavy[names(count)]) <- unname(count)
+  
+  uniqueLight <- unique(dupLight)
+  count <- table(names(dupLight))
+  altDepth(uniqueLight[names(count)]) <- unname(count)
+  
+  # Find any variants that have reads on both heavy and light strands
+  matchedLight <- match(names(uniqueLight), names(uniqueHeavy))
+  
+  # For debugging purposes, keep track of which variants came from both strands
+  
+  # Variants that were only found on the light strand
+  lightMvr <- uniqueLight[which(is.na(matchedLight))]
+  
+  # These are overlapping light strands
+  matchedLightIndex <- which(!is.na(matchedLight))
+  matchedLightMvr <- uniqueLight[matchedLightIndex]
+  
+  uniqueHeavy$bothStrands <- FALSE
+  
+  # Only have to add the altDepths since the refDepths will be the same for 'duplicated' variants
+  altDepth(uniqueHeavy[matchedLight[matchedLightIndex]]) <- altDepth(uniqueHeavy[matchedLight[matchedLightIndex]]) + altDepth(matchedLightMvr)
+  uniqueHeavy[matchedLight[matchedLightIndex]]$bothStrands <- TRUE
+  
+  # Combine them together
+  mvr <- MVRanges(c(uniqueHeavy, lightMvr), coverage=covg)
+  mvr <- sort(mvr, ignore.strand=T)
+  
+  ###############################
+  
   # Only keep unique variants (based upon names that were just assigned)
-  mvrIndelunique <- sort(unique(mvrIndel), ignore.strand=T)
+  #mvrIndelunique <- sort(unique(mvrIndel), ignore.strand=T)
   
   # Assign altDepths based upon what was unique
   # Sometimes the order gets mixed up, so keep track of it
-  order <- match(names(mvrIndelunique), names(table(names(mvrIndel))))
-  count <- unname(table(names(mvrIndel))[order])
-  altDepth(mvrIndelunique) <- count
+  #order <- match(names(mvrIndelunique), names(table(names(mvrIndel))))
+  #count <- unname(table(names(mvrIndel))[order])
+  #altDepth(mvrIndelunique) <- count
   
   # Determine the refDepth
-  refDepth(mvrIndelunique) <- unname(countOverlaps(mvrIndelunique, refSupport))
+  refDepth(mvr) <- unname(countOverlaps(mvr, refSupport))
   
   # Recalculate totalDepth
-  totalDepth(mvrIndelunique) <- refDepth(mvrIndelunique) + altDepth(mvrIndelunique)
+  totalDepth(mvr) <- refDepth(mvr) + altDepth(mvr)
   
-  mvr <- MVRanges(mvrIndelunique, coverage = covg)
+  #mvr <- MVRanges(mvrIndelunique, coverage = covg)
   
   return(mvr)
   
