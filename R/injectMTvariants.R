@@ -4,7 +4,7 @@
 #' FIXME: this ONLY considers variants injected against rCRS, not RSRS or hg19. 
 #' 
 #' @param mvr       An MVRanges, usually from callMT, often subsetted
-#' @param gr        A GRanges, usually of protein-coding regions (the default)
+#' @param gr        A GRanges, usually of protein-n regions (the default)
 #' @param aa        Attempt to translate codon(s) affected by variant(s)? (TRUE)
 #' @param canon     Minimum VAF to treat variants as canonical by subject (0.99)
 #' @param refX      Reference depth below which variant is deemed canonical (1)
@@ -22,7 +22,7 @@
 #'
 #' @export
 injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
-
+  
   # rCRS only, for the time being 
   stopifnot(unique(genome(mvr)) == "rCRS")
   
@@ -92,7 +92,11 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
     gr[g]$varAA <- suppressWarnings(translate(gr[g]$varSeq, MT_CODE))
     
     # AA sequence from the reference at the variant site
-    orig <- extractAt(gr[g]$refAA, IRanges(submvr[i]$startCodon, submvr[i]$endCodon))
+    # I was trying to be conservative on the codon position
+    # Always assume the end of the AA sequence is end for getting the reference AA if that is the case
+    endCodon <- submvr[i]$endCodon
+    if (submvr[i]$endCodon > width(gr[g]$refAA)) endCodon <- width(gr[g]$refAA)
+    orig <- extractAt(gr[g]$refAA, IRanges(submvr[i]$startCodon, endCodon))
     
     # If there is a deletion at the end of a gene
     # Must go here otherwise the endCodon value changes and you get the incorrect reference AA

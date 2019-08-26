@@ -30,7 +30,7 @@
 #' 
 #' @export
 
-decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, cores=1, ...) {
+decomposeAndCalcConsequences <- function(mvr, coding=T, AAchanges=TRUE, parallel=FALSE, cores=1, ...) {
   #this will decompose non-disjoint ranges for injectMTVariants()
   if (!class(mvr) %in% c("MVRanges", "MVRangesList")) stop("Input is not an MVRanges or MVRangesList.")
   #mvr.ovlps <- findOverlaps(mvr, type = "any")
@@ -57,7 +57,7 @@ decomposeAndCalcConsequences <- function(mvr, AAchanges=TRUE, parallel=FALSE, co
   covg <- genomeCoverage(mvr)
   
   #preprocess the variants
-  mvr <- .getCoding(mvr, ...)
+  if (coding) mvr <- .getCoding(mvr, ...)
 
   if (length(mvr) == 0) {
     message("No variants found within the coding region, returning empty MVRanges")

@@ -14,7 +14,7 @@
 #' 
 #' @export
 
-getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
+getProteinImpact <- function(mvr, coding=T, parallel=FALSE, cores=1) {
 
   if (genome(mvr) != "rCRS") {
     message("getProteinImpact only works with humans, with rCRS reference genomes")
@@ -37,9 +37,9 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
   stopifnot(is(mvr, "MVRanges"))
   
   message("Processing consequences for ", sampleNames(mvr)@values)
-  
+
   # Right now can only handle variants in coding regions
-  mvr <- .getCodingRegions(mvr)
+  if (coding) mvr <- .getCodingRegions(mvr)
   
   # Return empty MVRanges if there are none in coding regions
   if (length(mvr) == 0) return(mvr)

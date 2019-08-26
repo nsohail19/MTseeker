@@ -10,7 +10,7 @@
 #' @export
 
 
-locateMTvariants <- function(query) {
+locateMTvariants <- function(query, coding=T) {
 
   # Checks if the function has been run before
   if ("gene" %in% names(mcols(query)) &
@@ -42,7 +42,7 @@ locateMTvariants <- function(query) {
   #anno <- subset(mtAnno, region %in% c("tRNA", "coding"))
   
   # decomposeAndCalc throws me an error when I try to use tRNA
-  anno <- subset(mtAnno, region == "coding")
+  if (coding) anno <- subset(mtAnno, region == "coding")
   ol <- findOverlaps(query, anno, ignore.strand=TRUE)
   
   if (length(ol) == 0) {
