@@ -7,7 +7,7 @@
 #'
 #'
 #'
-#'
+#' @export
 
 
 locateMTvariants <- function(query) {

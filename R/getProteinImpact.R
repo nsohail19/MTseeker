@@ -88,7 +88,7 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
       else {
         
         if (mitOut$Ref[index] != ref(mvr[i])) {
-          message("Reference disparity between APOGEE and pileup")
+          message(paste0("Reference disparity between APOGEE and pileup for variant: ", names(mvr[i]), " in sample ", mvr[i]$sampleNames))
         }
         
         out <- mitOut[index,]
@@ -107,8 +107,8 @@ getProteinImpact <- function(mvr, parallel=FALSE, cores=1) {
  
   # When using decompAndCalcCons, if there are no AA changes, it will set it to ""
   # Setting it to NA if someone wants to remove synonymous mutation later on
-  mvr[which(mvr$AAchange == "")]$AAchange <- NA_character_
-  mvr[which(!mvr$apogee)]$impacted.gene <- paste0("MT-", mvr[which(!mvr$apogee)]$impacted.gene) 
+  if (length(which(mvr$AAchange == "")) > 0) mvr[which(mvr$AAchange == "")]$AAchange <- NA_character_
+  if (length(which(!mvr$apogee)) > 0)  mvr[which(!mvr$apogee)]$impacted.gene <- paste0("MT-", mvr[which(!mvr$apogee)]$impacted.gene) 
   
   # Adds a column determing type of mutation
   # Missense, synonymous, nonsense, insertion, deletion, or frameshift
