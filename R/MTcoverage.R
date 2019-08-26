@@ -72,13 +72,14 @@ plotMTCoverage <- function(x, ref=c("rCRS", "NC_005089"), ...) {
     stop()
   }
   
-  if (length(x) > 1) {
-    message("You can only plot the coverage of 1 sample at a time")
-    stop()
-  }
-  
   if (is(x, "GAlignmentsList")) {
-    x <- unlist(x)
+    
+    if (length(x) > 1) {
+      message("You can only plot the coverage of 1 sample at a time")
+      stop()
+    }
+    
+    else x <- unlist(x)
   }
 
   if (is(x, "GAlignments")) {
