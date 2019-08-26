@@ -28,7 +28,7 @@ rawMTreads <- function(bams) {
   }
   
   else {
-    sbp <- scanMT(bams, mapqFilter=20)
+    sbp <- scanMT(bams)
     bamWhat(sbp) <- "seq"
     reads <- readGAlignments(file=bams, param=sbp)
 
