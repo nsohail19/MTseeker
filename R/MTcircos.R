@@ -122,15 +122,17 @@ MTcircos <- function(variants=NULL, outside=NULL, inside=NULL, outcol=NULL,
   
   # Color code according to AA changes
   if (how == "AA") {
-    legend("topright", title="Type of Variant", ncol=2,
-           legend=c("Missense", "Nonsense", "Synonymous", "Insertion", "Deletion", "Frameshift"), col=viridis(6), pch=15, cex=0.8)
+    legend("topright", title="AA Change", ncol=2,
+           legend=c("Missense", "Nonsense", "Synonymous", "Insertion", "Deletion", "Frameshift"), 
+           col=viridis(6), pch=15, cex=0.6)
     
   }
 
   
   else {
-    legend("topright", title="Type of Variant",
-           legend=c("Insertion", "Deletion", "SNV"), col=c("red", "blue", "black"), pch=15, cex=0.8)
+    legend("topright", title="Variant Type",
+           legend=c("Insertion", "Deletion", "SNV"), col=c("red", "blue", "black"), 
+           pch=15, cex=0.8)
   }
  
   

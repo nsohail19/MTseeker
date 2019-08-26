@@ -44,8 +44,6 @@ initMTcircos <- function(x) {
     refWidth <- 16299
   }
   
-  # For some reason circlize will plot this alphabetically??
-  # Not sure how to fix that, so will just do things in order instead
   dat <- data.frame(name=names(anno), start=start(anno), end=end(anno))
   
   circos.par("clock.wise"=FALSE, "start.degree"=90, "gap.degree"=0, 
@@ -105,8 +103,8 @@ genesMTcircos <- function(x, anno, legends=F) {
     colDF$label[7] <- "Complex V"
     colDF$label[8] <- "Complex III"
     
-    legend("topleft", title="Regions", ncol=2,
-           legend=colDF$label, col=colDF$col, pch=15, cex=0.8)
+    legend("topleft", ncol=2, title="MT Regions",
+           legend=colDF$label, col=colDF$col, pch=15, cex=0.6)
   }
   
   res <- list(anno=dat, pfun=pfun)
