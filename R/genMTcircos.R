@@ -46,13 +46,13 @@ initMTcircos <- function(x) {
   
   # For some reason circlize will plot this alphabetically??
   # Not sure how to fix that, so will just do things in order instead
-  dat <- data.frame(name=seq(1, length(anno), 1), start=start(anno), end=end(anno))
+  dat <- data.frame(name=names(anno), start=start(anno), end=end(anno))
   
   circos.par("clock.wise"=FALSE, "start.degree"=90, "gap.degree"=0, 
              "track.margin"=c(0.005, 0.005), "cell.padding"=c(0.005,0,0.005,0), 
              "points.overflow.warning"=FALSE)
   
-  circos.genomicInitialize(data=dat, plotType=NULL)
+  circos.genomicInitialize(factor=factor(dat$name, levels=dat$name), data=dat, plotType=NULL)
   
   return(anno)
 }
@@ -60,8 +60,8 @@ initMTcircos <- function(x) {
 # Actually plot the rings with the gene names
 genesMTcircos <- function(x, anno, legends=F) {
   
-  #dat <- data.frame(name=names(anno), start=start(anno), end=end(anno))
-  dat <- data.frame(name=seq(1, length(anno), 1), start=start(anno), end=end(anno))
+  dat <- data.frame(name=names(anno), start=start(anno), end=end(anno), stringsAsFactors = F)
+  #dat <- data.frame(name=seq(1, length(anno), 1), start=start(anno), end=end(anno))
   row.names(dat) <- names(anno)
 
   pfun <- function(x, y) {
@@ -69,11 +69,11 @@ genesMTcircos <- function(x, anno, legends=F) {
     xlim <- CELL_META$xlim
     ylim <- CELL_META$ylim
     
-    gr <- anno[as.numeric(CELL_META$sector.index)]
+    gr <- anno[CELL_META$sector.index]
     
     ytop <- .height(gr) * ifelse(strand(gr) == "+", 1, 0)
     ybot <- .height(gr) * ifelse(strand(gr) == "-", -1, 0)
-    lab <- ifelse(names(gr) == "DLP", "CR", names(gr))
+    lab <- ifelse(CELL_META$sector.index == "DLP", "CR", CELL_META$sector.index)
     
     circos.rect(xlim[1], ybot, xlim[2], ytop, col=gr$itemRgb)
     
@@ -84,8 +84,8 @@ genesMTcircos <- function(x, anno, legends=F) {
     }
 
   }
-  
-  circos.track(factors=dat$names, panel.fun=pfun, ylim=c(-1,1), track.height=0.5, 
+
+  circos.track(panel.fun=pfun, ylim=c(-1,1), track.height=0.5, 
                track.margin=c(0,0), bg.border=NA)
   
   if (legends && genome(x) == "rCRS") {
