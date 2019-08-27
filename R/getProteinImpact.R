@@ -14,12 +14,28 @@
 #' 
 #' @export
 
-getProteinImpact <- function(mvr, coding=T, parallel=FALSE, cores=1) {
+getProteinImpact <- function(mvr, coding=TRUE, parallel=FALSE, cores=1) {
 
   if (genome(mvr) != "rCRS") {
-    message("getProteinImpact only works with humans, with rCRS reference genomes")
-    message("Run decomposeAndCalcConsequences instead")
-    stop()
+    mvr <- decomposeAndCalcConsequences(mvr, coding=coding)
+    
+    if (is(mvr, "MVRanges")) mvr$apogee <- FALSE
+    else {
+      for (i in 1:length(mvr)) {
+        mcols(mvr[[i]])$apogee <- FALSE
+      }
+    }
+    
+    # When using decompAndCalcCons, if there are no AA changes, it will set it to ""
+    # Setting it to NA if someone wants to remove synonymous mutation later on
+    if (length(which(mvr$AAchange == "")) > 0) mvr[which(mvr$AAchange == "")]$AAchange <- NA_character_
+    if (length(which(!mvr$apogee)) > 0)  mvr[which(!mvr$apogee)]$impacted.gene <- paste0("MT-", mvr[which(!mvr$apogee)]$impacted.gene) 
+    
+    # Adds a column determing type of mutation
+    # Missense, synonymous, nonsense, insertion, deletion, or frameshift
+    mvr <- .typeMutation(mvr)
+    
+    return(mvr) 
   }
   
   # Set the number of cores if running in parallel
@@ -28,8 +44,8 @@ getProteinImpact <- function(mvr, coding=T, parallel=FALSE, cores=1) {
   
   if (is(mvr, "MVRangesList")) {
 
-    if (parallel) mvrl <- MVRangesList(mclapply(mvr, getProteinImpact))
-    else mvrl <- MVRangesList(lapply(mvr, getProteinImpact))
+    if (parallel) mvrl <- MVRangesList(mclapply(mvr, getProteinImpact, coding=coding))
+    else mvrl <- MVRangesList(lapply(mvr, getProteinImpact, coding=coding))
     
     return(mvrl)
   }
@@ -80,7 +96,7 @@ getProteinImpact <- function(mvr, coding=T, parallel=FALSE, cores=1) {
       # If none of the results from apogee have the same alt and ref sequence
       # Go back to the old way of doing things
       if (length(index) == 0) {
-        mvr[i] <- decomposeAndCalcConsequences(mvr[i])
+        mvr[i] <- decomposeAndCalcConsequences(mvr[i], coding=coding)
         mvr[i]$apogee <- FALSE
       } 
       
@@ -99,7 +115,7 @@ getProteinImpact <- function(mvr, coding=T, parallel=FALSE, cores=1) {
     
     # If mitimpact does not give a valid result, go back to the old way
     else {
-      mvr[i] <- decomposeAndCalcConsequences(mvr[i])
+      mvr[i] <- decomposeAndCalcConsequences(mvr[i], coding=coding)
       mvr[i]$apogee <- FALSE
     }
     
@@ -167,7 +183,9 @@ getProteinImpact <- function(mvr, coding=T, parallel=FALSE, cores=1) {
       # Where V is the ref AA and I is the alt AA to determine what change took place
       aaChange <- unlist(strsplit(gsub("\\d+", " ", mvr[snp]$AAchange[index]), " "))
       
-      if ("*" %in% aaChange[2]) mvr[snp]$typeMut[index] <- "nonsense"
+      # If the * was already a part of the reference sequence
+      # Then it is not a nonsense mutation
+      if ( ("*" %in% aaChange[2]) && !("*" %in% aaChange[1]) ) mvr[snp]$typeMut[index] <- "nonsense"
       else mvr[snp]$typeMut[index] <- "missense"
     }
     

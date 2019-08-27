@@ -30,7 +30,8 @@
 #' 
 #' @export
 
-decomposeAndCalcConsequences <- function(mvr, coding=T, AAchanges=TRUE, parallel=FALSE, cores=1, ...) {
+decomposeAndCalcConsequences <- function(mvr, coding, AAchanges=TRUE, parallel=FALSE, cores=1, ...) {
+  
   #this will decompose non-disjoint ranges for injectMTVariants()
   if (!class(mvr) %in% c("MVRanges", "MVRangesList")) stop("Input is not an MVRanges or MVRangesList.")
   #mvr.ovlps <- findOverlaps(mvr, type = "any")
@@ -41,7 +42,7 @@ decomposeAndCalcConsequences <- function(mvr, coding=T, AAchanges=TRUE, parallel
   
   #run in parallel
   if (is(mvr, "MVRangesList") & parallel) {
-    mvrl <- MVRangesList(mclapply(mvr, decomposeAndCalcConsequences, ...))
+    mvrl <- MVRangesList(mclapply(mvr, decomposeAndCalcConsequences, coding=coding, ...))
     return(mvrl)
   }
   
@@ -49,13 +50,13 @@ decomposeAndCalcConsequences <- function(mvr, coding=T, AAchanges=TRUE, parallel
   else if (is(mvr, "MVRangesList") && !parallel) {
     if (cores == 1) options("mc.cores"=detectCores()/2)
     else options("mc.cores"=cores)
-    mvrl <- MVRangesList(lapply(mvr, decomposeAndCalcConsequences, ...))
+    mvrl <- MVRangesList(lapply(mvr, decomposeAndCalcConsequences, coding=coding, ...))
     return(mvrl)
     }
 
   # Save the coverage information for later when we combine mvr and overlapMvr at the end
   covg <- genomeCoverage(mvr)
-  
+
   #preprocess the variants
   if (coding) mvr <- .getCoding(mvr, ...)
 
@@ -73,7 +74,7 @@ decomposeAndCalcConsequences <- function(mvr, coding=T, AAchanges=TRUE, parallel
   
   # Store overlapping variants here
   # Even though there will be doubles of variants
-  # I would rather they represent where the variant will occur
+  # At least you can see the potential depending on which gene it effects
   overlapMvr <- mvr[0]
   
   if (!isDisjoint(mvr)) {
@@ -84,8 +85,8 @@ decomposeAndCalcConsequences <- function(mvr, coding=T, AAchanges=TRUE, parallel
     if (AAchanges) {
 
       for (r in 1:length(mvr)) {
-
-        con <- injectMTVariants(mvr[r], ...)
+        
+        con <- injectMTVariants(mvr[r], coding=coding, ...)
         
         if (length(con) == 2) {
           
@@ -121,7 +122,7 @@ decomposeAndCalcConsequences <- function(mvr, coding=T, AAchanges=TRUE, parallel
     if (AAchanges) {
       
       for (r in 1:length(mvr)) {
-        con <- injectMTVariants(mvr[r], ...)
+        con <- injectMTVariants(mvr[r], coding=coding, ...)
         
         if (length(con) == 2) {
 

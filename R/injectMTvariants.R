@@ -21,13 +21,13 @@
 #' injectMTVariants(RO_2)
 #'
 #' @export
-injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
-  
+injectMTVariants <- function(mvr, coding, gr=NULL, refX=1, altX=1) {
+
   # rCRS only, for the time being 
   stopifnot(unique(genome(mvr)) == "rCRS")
   
   # get mtGenes if needed 
-  if (is.null(gr)) gr <- genes(mvr)
+  if (is.null(gr)) gr <- .getAnno(genome(mvr))
   stopifnot(unique(genome(gr)) == "rCRS")
   
   # Assuming you have filtered by now
@@ -36,7 +36,7 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
   # No mvr given
   if (!length(mvr)) return(mvr[0])
 
-  submvr <- locateMTvariants(subsetByOverlaps(mvr, gr, type="within"))
+  submvr <- locateMTvariants(mvr, coding=coding)
 
   # If submvr is empty
   if (!length(submvr)) return(mvr[0])
@@ -44,18 +44,35 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
   # mitochondrial genomic sequence
   # FIXME: may not want to do this
   # FIXME: else may want to filter
+
   data(rCRSeq, package="MTseeker")
-  gr$refDNA <- getSeq(rCRSeq, gr)
-  altSeq <- DNAStringSet(replaceAt(rCRSeq[[1]], ranges(mvr), alt(mvr)))
-  names(altSeq) <- names(rCRSeq)
-  gr$varDNA <- getSeq(altSeq, gr)
+  #altSeq <- DNAStringSet(replaceAt(rCRSeq[[1]], ranges(mvr), alt(mvr)))
+  #names(altSeq) <- names(rCRSeq)
+  #gr$varDNA <- getSeq(altSeq, gr)
   
   # use MT_CODE to translate results
   MT_CODE <- getGeneticCode("SGC1")
   gr$refSeq <- getSeq(rCRSeq, gr)
-  gr$varSeq <- gr$refSeq 
-  gr$refAA <- suppressWarnings(translate(gr$refSeq, MT_CODE))
+  
+  # MT-RNR2 has an N in the sequence to allow for historic numbering to remain
+  # So that has to be deleted before we can translate to get the AA seq
+  if (genome(mvr) == "rCRS") {
+    
+    gr$refAA <- NA_character_
+    
+    # N is at bp 1737 of MT-RNR2
+    gr["MT-RNR2"]$refSeq <- replaceAt(gr["MT-RNR2"]$refSeq, IRanges(1437,1437), "")
+    gr$refAA <- suppressWarnings(translate(gr$refSeq, MT_CODE))
+    
+    # Now to keep numbering, we have to get the original reference sequence back
+    gr["MT-RNR2"]$refSeq <- getSeq(rCRSeq, gr["MT-RNR2"])
+    
+  } else gr$refAA <- suppressWarnings(translate(gr$refSeq, MT_CODE))
+  
+  # This function make modifications based upon the reference
+  # So for now the variant sequences are the same
   gr$varAA <- gr$refAA
+  gr$varSeq <- gr$refSeq 
   
   gr$consequences <- NA_character_
   #gr$typeMut <- NA_character_
@@ -83,7 +100,11 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
         message("It is difficult to pinpoint an MT-ND6 variant start location, skipping . . .")
         next
       }
-      else message("Injecting variant incorrectly")
+      else {
+        message("Injecting variant incorrectly")
+        show(submvr[i])
+      }
+      
     }
                         
     # Replace the part of the reference sequences with the variants
@@ -212,4 +233,14 @@ injectMTVariants <- function(mvr, gr=NULL, refX=1, altX=1) {
   # Store the information
   gr[g]$typeMut <- submvr[i]$typeMut
   
+}
+
+.getAnno <- function(ref) {
+  
+  if (ref == "rCRS") {
+    data("mtAnno.rCRS", package="MTseeker")
+    anno <- mtAnno
+  }
+  
+  return(anno)
 }
