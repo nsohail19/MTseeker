@@ -216,6 +216,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     
     # Keep track of variants found on both strands for debugging purposes
     heavyMvr$bothStrands <- FALSE
+    uniqueLightMvr$bothStrands <- FALSE
     
     # Only have to add the altDepths since the refDepths will be the same for 'duplicated' variants
     altDepth(heavyMvr[matchedLight[matchedLightIndex]]) <- altDepth(heavyMvr[matchedLight[matchedLightIndex]]) + altDepth(matchedLightMvr)
@@ -735,6 +736,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   matchedLightMvr <- uniqueLight[matchedLightIndex]
   
   uniqueHeavy$bothStrands <- FALSE
+  lightMvr$bothStrands <- FALSE
   
   # Only have to add the altDepths since the refDepths will be the same for 'duplicated' variants
   altDepth(uniqueHeavy[matchedLight[matchedLightIndex]]) <- altDepth(uniqueHeavy[matchedLight[matchedLightIndex]]) + altDepth(matchedLightMvr)
