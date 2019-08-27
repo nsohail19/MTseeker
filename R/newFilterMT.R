@@ -74,7 +74,7 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2, minVAF=0.90,
     if (genome(vars) == "rCRS") {
       
       return(.rCRSfilter(vars, fp=fpFilter, NuMT=NuMT, 
-                         minTotalDepth=minTotalDepth, minAltDepth=minAltDepth))
+                         minTotalDepth=minTotalDepth, minAltDepth=minAltDepth, minVAF=minVAF))
     }
     
     else {
@@ -140,7 +140,7 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2, minVAF=0.90,
 
 # helper fn
 # More complicated filter for rCRS ref genome
-.rCRSfilter <- function(vars, fp=TRUE, NuMT=TRUE, minTotalDepth=20, minAltDepth=2) {
+.rCRSfilter <- function(vars, fp=TRUE, NuMT=TRUE, minTotalDepth=20, minAltDepth=2, minVAF=0.90) {
 
   # False positive filter
   if (fp) {
