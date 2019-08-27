@@ -112,7 +112,7 @@ plotMTCoverage <- function(x, ref=c("rCRS", "NC_005089"), ...) {
   circos.yaxis("right", labels.cex=0.5)
   
   # Plot the genes of the circos plot
-  genesMTcircos(x, anno)
+  genesMTcircos(x, anno, legends=T)
   
   # Store the information
   dat <- data.frame(name=names(anno), start=start(anno), end=end(anno))
