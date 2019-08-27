@@ -39,7 +39,7 @@
 #'
 #' @export
 newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
-                         minCovg=20, fpFilter=FALSE, NuMT=FALSE, verbose=FALSE) {
+                         minCovg=20, fpFilter=TRUE, NuMT=TRUE, verbose=FALSE) {
   
   if (is(vars, "MVRangesList")) {
     
@@ -102,7 +102,7 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
 
 # helper fn
 # If the input is a data frame
-.variantsDF <- function(DFSE, fpFilter=FALSE, NuMT=FALSE, verbose=FALSE) {
+.variantsDF <- function(DFSE, fpFilter=FALSE, NuMT=TRUE, verbose=FALSE) {
   
   if (is(DFSE, "DataFrame") | is(DFSE, "data.frame")) {
     stopifnot("mtCovg" %in% names(DFSE))
