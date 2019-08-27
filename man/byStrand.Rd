@@ -9,7 +9,7 @@ byStrand(x, anno)
 \arguments{
 \item{x}{a *Ranges[List] or *Alignments[List]}
 
-\item{anno}{optional feature annotation, will use mtAnno.rCRS if NULL}
+\item{anno}{Annotation information for the reference genome}
 }
 \value{
 elements of x over features on each strand OR x split by strand

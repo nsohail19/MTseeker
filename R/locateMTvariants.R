@@ -2,6 +2,7 @@
 #' Primarily meant to be used within injectMTvarients
 #' 
 #' @param query      A single variant in MVRanges form 
+#' @param coding     TRUE to look only at coding regions
 #'
 #' @return           An MVRanges with start and end codons (overlaps return 2 copies of the variant)
 #'

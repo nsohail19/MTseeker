@@ -4,11 +4,13 @@
 \alias{decomposeAndCalcConsequences}
 \title{Decompose and annotate AA changes in MT variants}
 \usage{
-decomposeAndCalcConsequences(mvr, AAchanges = TRUE, parallel = FALSE,
-  cores = 1, ...)
+decomposeAndCalcConsequences(mvr, coding, AAchanges = TRUE,
+  parallel = FALSE, cores = 1, ...)
 }
 \arguments{
 \item{mvr}{An MVRangesList or MVRanges object}
+
+\item{coding}{TRUE when annotating only coding regions}
 
 \item{AAchanges}{Whether to annotate amino acid (AA) changes}
 

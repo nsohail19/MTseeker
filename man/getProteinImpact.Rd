@@ -4,10 +4,12 @@
 \alias{getProteinImpact}
 \title{Annotate AA changes in MT variants}
 \usage{
-getProteinImpact(mvr, parallel = FALSE, cores = 1)
+getProteinImpact(mvr, coding = TRUE, parallel = FALSE, cores = 1)
 }
 \arguments{
 \item{mvr}{An MVRangesList or MVRanges object}
+
+\item{coding}{TRUE implies look at only coding regions}
 
 \item{parallel}{Whether to run things in parallel}
 }

@@ -6,7 +6,6 @@
 #'
 #'
 #' @examples 
-#' 
 #' library(MTseekerData)
 #' BAMdir <- system.file("extdata", "BAMs", package="MTseekerData")
 #' BAMs <- list.files(BAMdir, pattern="bam$")
@@ -50,6 +49,7 @@ initMTcircos <- function(x) {
              "track.margin"=c(0.005, 0.005), "cell.padding"=c(0.005,0,0.005,0), 
              "points.overflow.warning"=FALSE)
   
+  # Important to set the factor levels otherwise plot is out of order
   circos.genomicInitialize(factor=factor(dat$name, levels=dat$name), data=dat, plotType=NULL)
   
   return(anno)
@@ -59,7 +59,7 @@ initMTcircos <- function(x) {
 genesMTcircos <- function(x, anno, legends=F) {
   
   dat <- data.frame(name=names(anno), start=start(anno), end=end(anno), stringsAsFactors = F)
-  #dat <- data.frame(name=seq(1, length(anno), 1), start=start(anno), end=end(anno))
+  
   row.names(dat) <- names(anno)
 
   pfun <- function(x, y) {

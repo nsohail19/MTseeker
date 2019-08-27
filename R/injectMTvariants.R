@@ -5,10 +5,7 @@
 #' 
 #' @param mvr       An MVRanges, usually from callMT, often subsetted
 #' @param gr        A GRanges, usually of protein-n regions (the default)
-#' @param aa        Attempt to translate codon(s) affected by variant(s)? (TRUE)
-#' @param canon     Minimum VAF to treat variants as canonical by subject (0.99)
-#' @param refX      Reference depth below which variant is deemed canonical (1)
-#' @param altX      Alternative depth above which variants deemed canonical (1)
+#' @param coding    TRUE to only look at coding regions
 #' 
 #' @return          The GRanges, with ref/var DNA and AA and 
 #' 
@@ -21,7 +18,7 @@
 #' injectMTVariants(RO_2)
 #'
 #' @export
-injectMTVariants <- function(mvr, coding, gr=NULL, refX=1, altX=1) {
+injectMTVariants <- function(mvr, coding, gr=NULL) {
 
   # rCRS only, for the time being 
   stopifnot(unique(genome(mvr)) == "rCRS")

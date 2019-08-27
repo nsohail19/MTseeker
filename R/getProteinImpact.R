@@ -3,6 +3,7 @@
 #' @name getProteinImpact
 #'
 #' @param mvr         An MVRangesList or MVRanges object
+#' @param coding      TRUE implies look at only coding regions
 #' @param parallel    Whether to run things in parallel
 #' 
 #'

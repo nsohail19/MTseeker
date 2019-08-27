@@ -4,8 +4,8 @@
 \alias{newFilterMT}
 \title{Filter SummarizedExperiment, DataFrame, MVRanges, or MVRangesList using user specified constraints}
 \usage{
-newFilterMT(vars, minTotalDepth = 20, minAltDepth = 2, minCovg = 20,
-  fpFilter = FALSE, NuMT = FALSE, verbose = FALSE)
+newFilterMT(vars, minTotalDepth = 20, minAltDepth = 2, minVAF = 0.9,
+  minCovg = 20, fpFilter = TRUE, NuMT = TRUE, verbose = FALSE)
 }
 \arguments{
 \item{vars}{variants, can be MVRanges[List] or DataFrame/SummarizedExperiment with colData()$`mtCovg`}
@@ -13,6 +13,8 @@ newFilterMT(vars, minTotalDepth = 20, minAltDepth = 2, minCovg = 20,
 \item{minTotalDepth}{minimum number of total reads (ref + alt reads) (20)}
 
 \item{minAltDepth}{minimum number of reads supporting a mutation needed (2)}
+
+\item{minVAF}{minimum VAF to be considered (0.90)}
 
 \item{minCovg}{minimum total depth (20, cf. Griffin, Genetics in Medicine 2014)}
 

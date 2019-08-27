@@ -4,20 +4,14 @@
 \alias{injectMTVariants}
 \title{Inject (one or more) variants against rCRS.}
 \usage{
-injectMTVariants(mvr, gr = NULL, refX = 1, altX = 1)
+injectMTVariants(mvr, coding, gr = NULL)
 }
 \arguments{
 \item{mvr}{An MVRanges, usually from callMT, often subsetted}
 
-\item{gr}{A GRanges, usually of protein-coding regions (the default)}
+\item{coding}{TRUE to only look at coding regions}
 
-\item{refX}{Reference depth below which variant is deemed canonical (1)}
-
-\item{altX}{Alternative depth above which variants deemed canonical (1)}
-
-\item{aa}{Attempt to translate codon(s) affected by variant(s)? (TRUE)}
-
-\item{canon}{Minimum VAF to treat variants as canonical by subject (0.99)}
+\item{gr}{A GRanges, usually of protein-n regions (the default)}
 }
 \value{
 The GRanges, with ref/var DNA and AA and

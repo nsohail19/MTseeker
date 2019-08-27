@@ -24,6 +24,7 @@
 #' @param vars              variants, can be MVRanges[List] or DataFrame/SummarizedExperiment with colData()$`mtCovg`
 #' @param minTotalDepth     minimum number of total reads (ref + alt reads) (20)
 #' @param minAltDepth       minimum number of reads supporting a mutation needed (2)
+#' @param minVAF            minimum VAF to be considered (0.90)
 #' @param minCovg           minimum total depth (20, cf. Griffin, Genetics in Medicine 2014)
 #' @param fpFilter          apply Triska's homopolymer false positive filter? Only applicable for rCRS (FALSE)
 #' @param NuMT              apply the 0.03 VAF NuMT filter from Ju (GR 2015)? (FALSE)
@@ -38,7 +39,7 @@
 #' filterMT(data.frame(sample="foo", mtCovg=1000))
 #'
 #' @export
-newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
+newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2, minVAF=0.90,
                          minCovg=20, fpFilter=TRUE, NuMT=TRUE, verbose=FALSE) {
   
   if (is(vars, "MVRangesList")) {
@@ -81,6 +82,7 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
       # Only keep variants with a minimum altDept and totalDepth as specified by the user
       vars <- subset(vars, !is.na(altDepth(vars)) & altDepth(vars) >= minAltDepth)
       vars <- subset(vars, !is.na(totalDepth(vars)) & totalDepth(vars) >= minTotalDepth)
+      vars <- subset(vars, VAF >= minVAF)
       
       # Nuclear contamination
       if (NuMT) vars <- subset(vars, VAF >= 0.03)
@@ -154,6 +156,7 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
   # Only keep variants with an altDept of at least minAltDepth
   vars <- subset(vars, !is.na(altDepth(vars)) & altDepth(vars) >= minAltDepth)
   vars <- subset(vars, !is.na(totalDepth(vars)) & totalDepth(vars) >= minTotalDepth)
+  vars <- subset(vars, VAF >= minVAF)
   
   # Nuclear contamination
   if (NuMT) {
@@ -162,7 +165,7 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2,
     vars <- subsetByOverlaps(vars, fpFilter)
   }
   
-  if ("PASS" %in% names(mcols(vars))) vars <- subset(vars, PASS)
+  #if ("PASS" %in% names(mcols(vars))) vars <- subset(vars, PASS)
 
   # If it is empty, return the empty MVRanges
   if (length(vars) == 0) return(vars)

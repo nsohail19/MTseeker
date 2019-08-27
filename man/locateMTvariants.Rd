@@ -5,10 +5,12 @@
 \title{Locates the variant and determines local bounds within gene
 Primarily meant to be used within injectMTvarients}
 \usage{
-locateMTvariants(query)
+locateMTvariants(query, coding)
 }
 \arguments{
 \item{query}{A single variant in MVRanges form}
+
+\item{coding}{TRUE to look only at coding regions}
 }
 \value{
 An MVRanges with start and end codons (overlaps return 2 copies of the variant)

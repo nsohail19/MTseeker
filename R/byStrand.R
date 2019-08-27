@@ -6,7 +6,7 @@
 #' light strands of the mitochondrial genome. 
 #' 
 #' @param x     a *Ranges[List] or *Alignments[List]
-#' @param anno  optional feature annotation, will use mtAnno.rCRS if NULL 
+#' @param anno  Annotation information for the reference genome
 #'
 #' @return      elements of x over features on each strand OR x split by strand 
 #' 

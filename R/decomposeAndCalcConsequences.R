@@ -3,7 +3,8 @@
 #' @name decomposeAndCalcConsequences
 #'
 #' @param mvr    An MVRangesList or MVRanges object
-#' @param AAchanges   Whether to annotate amino acid (AA) changes
+#' @param coding  TRUE when annotating only coding regions
+#' @param AAchanges   Whether to annotate amino acid (AA) changes 
 #' @param parallel    Whether to run things in parallel
 #' @param ...    Other arguments to pass to injectMTVariants
 #'
