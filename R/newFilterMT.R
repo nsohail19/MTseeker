@@ -57,7 +57,7 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2, minVAF=0.90,
     #test <- mclapply(vars, noorfilterMT, minTotalDepth=minTotalDepth, minAltDepth=minAltDepth,
     #                 minCovg=minCovg, fpFilter=fpFilter, NuMT=NuMT, verbose=verbose)
     
-    mvr <- lapply(vars, newFilterMT, minTotalDepth=minTotalDepth, minAltDepth=minAltDepth,
+    mvr <- lapply(vars, newFilterMT, minTotalDepth=minTotalDepth, minAltDepth=minAltDepth, minVAF=minVAF,
                                       minCovg=minCovg, fpFilter=fpFilter, NuMT=NuMT, verbose=verbose)
     return(MVRangesList(mvr))
   } 
@@ -171,6 +171,6 @@ newFilterMT <- function(vars, minTotalDepth=20, minAltDepth=2, minVAF=0.90,
   if (length(vars) == 0) return(vars)
   
   names(vars) <- MTHGVS(vars)
-  
+
   return(vars)
 }

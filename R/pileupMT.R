@@ -271,6 +271,11 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   metadata(mvr)$sbp <- sbp
   metadata(mvr)$pup <- pup
   metadata(mvr)$coverageRle <- coverage(mvr)
+  
+  # A double check to make sure these two values get tallied
+  totalDepth(mvr) <- altDepth(mvr) + refDepth(mvr)
+  mvr$VAF <- altDepth(mvr) / totalDepth(mvr)
+  
   return(mvr)
 }
 
