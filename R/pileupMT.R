@@ -142,7 +142,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
 
     # This is to help with debugging
     mcols(indelReads)$bam <- sampNames
-    mcols(indelReads)$potentialHaplo <- FALSE
+    #mcols(indelReads)$potentialHaplo <- FALSE
     
     message("Tallying indels for: ", sampNames)
 
@@ -234,13 +234,14 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     
     # Determine if these are potentially a part of haplogroup regions
     # Only for human genomes
-    if (ref == "rCRS") {
-      data(haplomask_whitelist)
-      mvr$potentialHaplo <- FALSE
+    # Decided not to use this since it may confuse the user
+    #if (ref == "rCRS") {
+      #data(haplomask_whitelist)
+      #mvr$potentialHaplo <- FALSE
       
-      haploNames <- names(subsetByOverlaps(mvr, haplomask_whitelist[[1]]))
-      mvr[haploNames]$potentialHaplo <- TRUE
-    }
+      #haploNames <- names(subsetByOverlaps(mvr, haplomask_whitelist[[1]]))
+      #mvr[haploNames]$potentialHaplo <- TRUE
+    #}
 
     names(mvr) <- MTHGVS(mvr)
   }
@@ -359,7 +360,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
     # Iterate through in case there are multiple deletions and insertions
     for (i in 1:length(indelIndex)) {
 
-      potentialHaplo <- FALSE
+      #potentialHaplo <- FALSE
       
       # Find the number of base pairs that are soft clips
       # Only want to look at the information before the currently considered indel
@@ -467,7 +468,9 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
           
           if (length(haploIns) > 0 && ref == "rCRS") {
             #message(paste("Potential haplogroup insertion variant at position:", as.character(startPos), "for sample:", as.character(mcols(indelRead)$bam)))
-            potentialHaplo <- TRUE
+            #potentialHaplo <- TRUE
+            
+            # Leaving this if statement because this exception is fine to keep
           }
           
           else {
@@ -554,7 +557,9 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
           
           if (length(haploDels) > 0 && ref == "rCRS") {
             #message(paste("Potential haplogroup deletion variant at position:", as.character(startPos), "for sample:",as.character(mcols(indelRead)$bam)))
-            potentialHaplo <- TRUE
+            #potentialHaplo <- TRUE
+            
+            # Leave the if statement here because we do not want to remove haplogroup variants
           }
           
           else if (startPos == 3106) {
@@ -579,7 +584,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         mcols(newIndelRead)$indelEnd <- endPos
         mcols(newIndelRead)$alt <- alt
         mcols(newIndelRead)$ref <- refs
-        mcols(newIndelRead)$potentialHaplo <- potentialHaplo
+        #mcols(newIndelRead)$potentialHaplo <- potentialHaplo
       }
       
       # Append another indel to the first one
@@ -591,7 +596,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
         mcols(appendIndelRead)$indelEnd <- endPos
         mcols(appendIndelRead)$alt <- alt
         mcols(appendIndelRead)$ref <- refs
-        mcols(appendIndelRead)$potentialHaplo <- potentialHaplo
+        #mcols(appendIndelRead)$potentialHaplo <- potentialHaplo
         
         newIndelRead <- append(newIndelRead, appendIndelRead)
       }
@@ -675,7 +680,7 @@ pileupMT <- function(bam, sbp=NULL, pup=NULL, parallel=FALSE, cores=1, ref=c("rC
   #pu$alleles <- .byPos(pu, "isAlt") + 1 
 
   # Turn into GRanges
-  columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth", "potentialHaplo", "strand")
+  columns <- c("seqnames","pos","ref","alt","totalDepth","refDepth","altDepth", "strand")
   grIndel <- keepSeqlevels(.puToGR(indelSupport[,columns]), unique(indelSupport$seqnames))
   seqinfo(grIndel) <- Seqinfo(levels(seqnames(grIndel)), width(.getRefSeq(ref)), isCircular=TRUE, genome=ref)
   
